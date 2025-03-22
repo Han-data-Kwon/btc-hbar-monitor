@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>BTC & HBAR 고래 누적 차트</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  <h2>📈 비트코인(BTC) 고래 누적 거래량</h2>
+  <canvas id="btcChart"></canvas>
+
+  <h2>📈 헤데라(HBAR) 고래 누적 거래량</h2>
+  <canvas id="hbarChart"></canvas>
+
+  <script>
+    const btcLabels = ["0-1 BTC", "1-10 BTC", "10-100 BTC", "100+ BTC"];
+    const hbarLabels = ["100K-1M HBAR", "1M-10M HBAR", "10M-100M HBAR", "100M+ HBAR"];
+    const colors = ["gray", "blue", "orange", "red"];
+
+    function makeDatasets(labels) {
+      return labels.map((label, i) => ({
+        label: label,
+        borderColor: colors[i],
+        data: [],
+        fill: false,
+        tension: 0.2,
+        pointRadius: 4
+      }));
+    }
+
+    const btcChart = new Chart(document.getElementById('btcChart').getContext('2d'), {
+      type: 'line',
+      data: { labels: [], datasets: makeDatasets(btcLabels) },
+      options: {
+        responsive: true,
+        plugins: {
+          tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${parseFloat(ctx.raw).toFixed(2)} BTC` } },
+          legend: { position: 'top' }
+        },
+        scales: { y: { beginAtZero: true }, x: { ticks: { autoSkip: true, maxTicksLimit: 10 } } }
+      }
+    });
+
+    const hbarChart = new Chart(document.getElementById('hbarChart').getContext('2d'), {
+      type: 'line',
+      data: { labels: [], datasets: makeDatasets(hbarLabels) },
+      options: {
+        responsive: true,
+        plugins: {
+          tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${parseFloat(ctx.raw).toFixed(2)} HBAR` } },
+          legend: { position: 'top' }
+        },
+        scales: { y: { beginAtZero: true }, x: { ticks: { autoSkip: true, maxTicksLimit: 10 } } }
+      }
+    });
+
+    async function fetchAndUpdate(api, chart, labels) {
+      const res = await fetch(api);
+      const data = await res.json();
+      chart.data.labels = data.timestamps;
+      labels.forEach((label, i) => {
+        chart.data.datasets[i].data = data.values[label];
+      });
+      chart.update();
+    }
+
+    async function updateCharts() {
+      await fetchAndUpdate("/api/btc", btcChart, btcLabels);
+      await fetchAndUpdate("/api/hbar", hbarChart, hbarLabels);
+    }
+
+    // 최초 실행 + 주기적 업데이트
+    updateCharts();
+    setInterval(updateCharts, 60000);
+  </script>
+</body>
+</html>

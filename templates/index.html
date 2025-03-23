@@ -2,76 +2,71 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8">
-  <title>BTC & HBAR 고래 누적 차트</title>
+  <title>📈 실시간 고래 거래량 (30초 단위 / 한국시간)</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
-  <h2>📈 비트코인(BTC) 고래 누적 거래량</h2>
+  <h2>🟠 비트코인 고래 거래량 (최근 30분)</h2>
   <canvas id="btcChart"></canvas>
 
-  <h2>📈 헤데라(HBAR) 고래 누적 거래량</h2>
+  <h2>🔵 헤데라 고래 거래량 (최근 30분)</h2>
   <canvas id="hbarChart"></canvas>
 
   <script>
-    const btcLabels = ["0-1 BTC", "1-10 BTC", "10-100 BTC", "100+ BTC"];
-    const hbarLabels = ["100K-1M HBAR", "1M-10M HBAR", "10M-100M HBAR", "100M+ HBAR"];
-    const colors = ["gray", "blue", "orange", "red"];
+    const btcCtx = document.getElementById('btcChart').getContext('2d');
+    const hbarCtx = document.getElementById('hbarChart').getContext('2d');
 
-    function makeDatasets(labels) {
-      return labels.map((label, i) => ({
-        label: label,
-        borderColor: colors[i],
-        data: [],
-        fill: false,
-        tension: 0.2,
-        pointRadius: 4
-      }));
-    }
-
-    const btcChart = new Chart(document.getElementById('btcChart').getContext('2d'), {
+    const createChart = (ctx, label) => new Chart(ctx, {
       type: 'line',
-      data: { labels: [], datasets: makeDatasets(btcLabels) },
+      data: {
+        labels: [],
+        datasets: [
+          { label: '0-1 단위', data: [], borderWidth: 2 },
+          { label: '1-10 단위', data: [], borderWidth: 2 },
+          { label: '10-100 단위', data: [], borderWidth: 2 },
+          { label: '100+ 단위', data: [], borderWidth: 2 }
+        ]
+      },
       options: {
         responsive: true,
-        plugins: {
-          tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${parseFloat(ctx.raw).toFixed(2)} BTC` } },
-          legend: { position: 'top' }
+        animation: false,
+        scales: {
+          x: {
+            title: { display: true, text: '시간 (KST)' }
+          },
+          y: {
+            beginAtZero: true,
+            title: { display: true, text: '거래 수량' }
+          }
         },
-        scales: { y: { beginAtZero: true }, x: { ticks: { autoSkip: true, maxTicksLimit: 10 } } }
+        plugins: {
+          tooltip: { enabled: true },
+          legend: { position: 'top' }
+        }
       }
     });
 
-    const hbarChart = new Chart(document.getElementById('hbarChart').getContext('2d'), {
-      type: 'line',
-      data: { labels: [], datasets: makeDatasets(hbarLabels) },
-      options: {
-        responsive: true,
-        plugins: {
-          tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${parseFloat(ctx.raw).toFixed(2)} HBAR` } },
-          legend: { position: 'top' }
-        },
-        scales: { y: { beginAtZero: true }, x: { ticks: { autoSkip: true, maxTicksLimit: 10 } } }
-      }
-    });
+    const btcChart = createChart(btcCtx, 'BTC');
+    const hbarChart = createChart(hbarCtx, 'HBAR');
 
-    async function fetchAndUpdate(api, chart, labels) {
-      const res = await fetch(api);
+    const updateChart = async (url, chart) => {
+      const res = await fetch(url);
       const data = await res.json();
-      chart.data.labels = data.timestamps;
-      labels.forEach((label, i) => {
-        chart.data.datasets[i].data = data.values[label];
-      });
+      chart.data.labels = data.map(d => d.time);
+      chart.data.datasets[0].data = data.map(d => d.data["0-1"]);
+      chart.data.datasets[1].data = data.map(d => d.data["1-10"]);
+      chart.data.datasets[2].data = data.map(d => d.data["10-100"]);
+      chart.data.datasets[3].data = data.map(d => d.data["100+"]);
       chart.update();
-    }
+    };
 
-    async function updateCharts() {
-      await fetchAndUpdate("/api/btc", btcChart, btcLabels);
-      await fetchAndUpdate("/api/hbar", hbarChart, hbarLabels);
-    }
+    const updateCharts = () => {
+      updateChart("/api/btc", btcChart);
+      updateChart("/api/hbar", hbarChart);
+    };
 
-    // 최초 실행 + 주기적 업데이트
-    updateCharts();
-    setInterval(updateCharts, 60000);
+    updateCharts(); // 최초 실행
+    setInterval(updateCharts, 30000); // ⏱ 30초마다 실행
   </script>
 </body>
 </html>

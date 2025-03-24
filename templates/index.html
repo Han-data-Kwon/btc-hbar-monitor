@@ -7,32 +7,27 @@
 </head>
 <body>
   <h2>🟠 비트코인 고래 거래량 (최근 30분)</h2>
-  <canvas id="btcChart"></canvas>
+  <h3 id="btcPrice">BTC 시세 로딩중...</h3>
+  <canvas id="btcChart" width="800" height="300"></canvas>
 
   <h2>🔵 헤데라 고래 거래량 (최근 30분)</h2>
-  <canvas id="hbarChart"></canvas>
-
-  <h3 id="btcPrice">BTC 시세 로딩중...</h3>
-  <canvas id="btcChart"></canvas>
-
   <h3 id="hbarPrice">HBAR 시세 로딩중...</h3>
-  <canvas id="hbarChart"></canvas>
+  <canvas id="hbarChart" width="800" height="300"></canvas>
 
   <script>
+    async function updatePrice() {
+      const res = await fetch("/api/price");
+      const data = await res.json();
 
-async function updatePrice() {
-  const res = await fetch("/api/price");
-  const data = await res.json();
+      const btc = data.BTC;
+      const hbar = data.HBAR;
 
-  const btc = data.BTC;
-  const hbar = data.HBAR;
+      document.getElementById("btcPrice").innerText =
+        `BTC: $${btc.price.toLocaleString()} (${btc.change >= 0 ? "+" : ""}${btc.change}%)`;
 
-  document.getElementById("btcPrice").innerText =
-    `BTC: $${btc.price.toLocaleString()} (${btc.change >= 0 ? "+" : ""}${btc.change}%)`;
-
-  document.getElementById("hbarPrice").innerText =
-    `HBAR: $${hbar.price.toFixed(4)} (${hbar.change >= 0 ? "+" : ""}${hbar.change}%)`;
-}
+      document.getElementById("hbarPrice").innerText =
+        `HBAR: $${hbar.price.toFixed(4)} (${hbar.change >= 0 ? "+" : ""}${hbar.change}%)`;
+    }
 
     const btcCtx = document.getElementById('btcChart').getContext('2d');
     const hbarCtx = document.getElementById('hbarChart').getContext('2d');
@@ -42,9 +37,9 @@ async function updatePrice() {
       data: {
         labels: [],
         datasets: [
-          { label: '0-1 단위', data: [], borderWidth: 2 },
-          { label: '1-10 단위', data: [], borderWidth: 2 },
-          { label: '10-100 단위', data: [], borderWidth: 2 },
+          { label: '0–1 단위', data: [], borderWidth: 2 },
+          { label: '1–10 단위', data: [], borderWidth: 2 },
+          { label: '10–100 단위', data: [], borderWidth: 2 },
           { label: '100+ 단위', data: [], borderWidth: 2 }
         ]
       },
@@ -74,10 +69,10 @@ async function updatePrice() {
       const res = await fetch(url);
       const data = await res.json();
       chart.data.labels = data.map(d => d.time);
-      chart.data.datasets[0].data = data.map(d => d.data["0-1"]);
-      chart.data.datasets[1].data = data.map(d => d.data["1-10"]);
-      chart.data.datasets[2].data = data.map(d => d.data["10-100"]);
-      chart.data.datasets[3].data = data.map(d => d.data["100+"]);
+      chart.data.datasets[0].data = data.map(d => d.data["0-1"].count);  // 건수 기반
+      chart.data.datasets[1].data = data.map(d => d.data["1-10"].count);
+      chart.data.datasets[2].data = data.map(d => d.data["10-100"].count);
+      chart.data.datasets[3].data = data.map(d => d.data["100+"].count);
       chart.update();
     };
 
@@ -87,10 +82,9 @@ async function updatePrice() {
     };
 
     updateCharts();
-    updatePrice(); // 👈 이것 추가
-    setInterval(updateCharts, 30000);
-    setInterval(updatePrice, 30000); // 👈 이것도 추가
-
+    updatePrice();
+    setInterval(updateCharts, 30000);   // 30초마다 갱신
+    setInterval(updatePrice, 30000);    // 30초마다 시세 갱신
   </script>
 </body>
 </html>

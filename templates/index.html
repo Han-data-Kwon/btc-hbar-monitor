@@ -4,87 +4,102 @@
   <meta charset="UTF-8">
   <title>📈 실시간 고래 거래량 (30초 단위 / 한국시간)</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    .tab { display: none; }
+    .tab.active { display: block; }
+    button { margin-right: 8px; }
+  </style>
 </head>
 <body>
-  <h2>🟠 비트코인 고래 거래량 (최근 30분)</h2>
-  <h3 id="btcPrice">BTC 시세 로딩중...</h3>
-  <canvas id="btcChart" width="800" height="300"></canvas>
+  <!-- 탭 버튼 -->
+  <div>
+    <button onclick="showTab('chart')">📊 거래 차트 보기</button>
+    <button onclick="showTab('whale')">🐋 고래 분석 보기</button>
+  </div>
 
-  <h2>🔵 헤데라 고래 거래량 (최근 30분)</h2>
-  <h3 id="hbarPrice">HBAR 시세 로딩중...</h3>
-  <canvas id="hbarChart" width="800" height="300"></canvas>
+  <!-- 거래 차트 탭 -->
+  <div id="chart" class="tab active">
+    <h2>🟠 비트코인 고래 거래량 (최근 30분)</h2>
+    <h3 id="btcPrice">BTC 시세 로딩중...</h3>
+    <canvas id="btcChartCount"></canvas>
+    <canvas id="btcChartVolume"></canvas>
+
+    <h2>🔵 헤데라 고래 거래량 (최근 30분)</h2>
+    <h3 id="hbarPrice">HBAR 시세 로딩중...</h3>
+    <canvas id="hbarChartCount"></canvas>
+    <canvas id="hbarChartVolume"></canvas>
+  </div>
+
+  <!-- 고래 분석 탭 -->
+  <div id="whale" class="tab">
+    <h2>🐳 주요 고래 분석 (준비 중)</h2>
+    <p>이 영역엔 곧 고래 주소 추적 및 매수/매도 정보가 들어갈 예정입니다.</p>
+  </div>
 
   <script>
+    function showTab(id) {
+      document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
+      document.getElementById(id).classList.add('active');
+    }
+
     async function updatePrice() {
       const res = await fetch("/api/price");
       const data = await res.json();
-
-      const btc = data.BTC;
-      const hbar = data.HBAR;
-
       document.getElementById("btcPrice").innerText =
-        `BTC: $${btc.price.toLocaleString()} (${btc.change >= 0 ? "+" : ""}${btc.change}%)`;
-
+        `BTC: $${data.BTC.price.toLocaleString()} (${data.BTC.change >= 0 ? '+' : ''}${data.BTC.change}%)`;
       document.getElementById("hbarPrice").innerText =
-        `HBAR: $${hbar.price.toFixed(4)} (${hbar.change >= 0 ? "+" : ""}${hbar.change}%)`;
+        `HBAR: $${data.HBAR.price.toFixed(4)} (${data.HBAR.change >= 0 ? '+' : ''}${data.HBAR.change}%)`;
     }
 
-    const btcCtx = document.getElementById('btcChart').getContext('2d');
-    const hbarCtx = document.getElementById('hbarChart').getContext('2d');
-
-    const createChart = (ctx, label) => new Chart(ctx, {
+    const makeChart = (id, label, unit) => new Chart(document.getElementById(id).getContext('2d'), {
       type: 'line',
       data: {
         labels: [],
         datasets: [
-          { label: '0–1 단위', data: [], borderWidth: 2 },
-          { label: '1–10 단위', data: [], borderWidth: 2 },
-          { label: '10–100 단위', data: [], borderWidth: 2 },
-          { label: '100+ 단위', data: [], borderWidth: 2 }
+          { label: '0-1', data: [], borderWidth: 2 },
+          { label: '1-10', data: [], borderWidth: 2 },
+          { label: '10-100', data: [], borderWidth: 2 },
+          { label: '100+', data: [], borderWidth: 2 }
         ]
       },
       options: {
         responsive: true,
         animation: false,
+        plugins: { legend: { position: 'top' } },
         scales: {
-          x: {
-            title: { display: true, text: '시간 (KST)' }
-          },
-          y: {
-            beginAtZero: true,
-            title: { display: true, text: '거래 수량' }
-          }
-        },
-        plugins: {
-          tooltip: { enabled: true },
-          legend: { position: 'top' }
+          x: { title: { display: true, text: '시간 (KST)' } },
+          y: { beginAtZero: true, title: { display: true, text: unit } }
         }
       }
     });
 
-    const btcChart = createChart(btcCtx, 'BTC');
-    const hbarChart = createChart(hbarCtx, 'HBAR');
+    const btcChartCount = makeChart('btcChartCount', 'BTC 거래 건수', '거래 건수');
+    const btcChartVolume = makeChart('btcChartVolume', 'BTC 거래량', '거래량');
+    const hbarChartCount = makeChart('hbarChartCount', 'HBAR 거래 건수', '거래 건수');
+    const hbarChartVolume = makeChart('hbarChartVolume', 'HBAR 거래량', '거래량');
 
-    const updateChart = async (url, chart) => {
+    const updateChart = async (url, chartCount, chartVolume) => {
       const res = await fetch(url);
       const data = await res.json();
-      chart.data.labels = data.map(d => d.time);
-      chart.data.datasets[0].data = data.map(d => d.data["0-1"].count);  // 건수 기반
-      chart.data.datasets[1].data = data.map(d => d.data["1-10"].count);
-      chart.data.datasets[2].data = data.map(d => d.data["10-100"].count);
-      chart.data.datasets[3].data = data.map(d => d.data["100+"].count);
-      chart.update();
+      chartCount.data.labels = chartVolume.data.labels = data.map(d => d.time);
+
+      ["0-1", "1-10", "10-100", "100+"].forEach((key, i) => {
+        chartCount.data.datasets[i].data = data.map(d => d.data[key].count);
+        chartVolume.data.datasets[i].data = data.map(d => d.data[key].volume);
+      });
+
+      chartCount.update();
+      chartVolume.update();
     };
 
-    const updateCharts = () => {
-      updateChart("/api/btc", btcChart);
-      updateChart("/api/hbar", hbarChart);
-    };
+    function updateAll() {
+      updateChart("/api/btc", btcChartCount, btcChartVolume);
+      updateChart("/api/hbar", hbarChartCount, hbarChartVolume);
+      updatePrice();
+    }
 
-    updateCharts();
-    updatePrice();
-    setInterval(updateCharts, 30000);   // 30초마다 갱신
-    setInterval(updatePrice, 30000);    // 30초마다 시세 갱신
+    updateAll();
+    setInterval(updateAll, 30000);
   </script>
 </body>
 </html>

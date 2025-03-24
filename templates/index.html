@@ -7,41 +7,60 @@
   <style>
     .tab { display: none; }
     .tab.active { display: block; }
-    button { margin-right: 8px; }
+    button { margin: 10px 10px 20px 0; padding: 8px 16px; font-weight: bold; }
+    table { border-collapse: collapse; width: 100%; margin-top: 10px; }
+    th, td { border: 1px solid #aaa; padding: 6px; text-align: center; font-size: 14px; }
+    th { background-color: #f0f0f0; }
   </style>
 </head>
 <body>
-  <!-- 탭 버튼 -->
+
+  <!-- 📌 탭 버튼 -->
   <div>
     <button onclick="showTab('chart')">📊 거래 차트 보기</button>
     <button onclick="showTab('whale')">🐋 고래 분석 보기</button>
   </div>
 
-  <!-- 거래 차트 탭 -->
+  <!-- 📊 거래 차트 탭 -->
   <div id="chart" class="tab active">
     <h2>🟠 비트코인 고래 거래량 (최근 30분)</h2>
     <h3 id="btcPrice">BTC 시세 로딩중...</h3>
-    <canvas id="btcChartCount"></canvas>
-    <canvas id="btcChartVolume"></canvas>
+    <canvas id="btcChartCount" height="150"></canvas>
+    <canvas id="btcChartVolume" height="150"></canvas>
 
     <h2>🔵 헤데라 고래 거래량 (최근 30분)</h2>
     <h3 id="hbarPrice">HBAR 시세 로딩중...</h3>
-    <canvas id="hbarChartCount"></canvas>
-    <canvas id="hbarChartVolume"></canvas>
+    <canvas id="hbarChartCount" height="150"></canvas>
+    <canvas id="hbarChartVolume" height="150"></canvas>
   </div>
 
-  <!-- 고래 분석 탭 -->
+  <!-- 🐋 고래 분석 탭 -->
   <div id="whale" class="tab">
-    <h2>🐳 주요 고래 분석 (준비 중)</h2>
-    <p>이 영역엔 곧 고래 주소 추적 및 매수/매도 정보가 들어갈 예정입니다.</p>
+    <h2>🐳 BTC 고래 거래 분석</h2>
+    <table id="btcTable">
+      <thead>
+        <tr><th>시간</th><th>From</th><th>To</th><th>수량</th><th>구간</th><th>매수/매도</th></tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+
+    <h2>🧊 HBAR 고래 거래 분석</h2>
+    <table id="hbarTable">
+      <thead>
+        <tr><th>시간</th><th>From</th><th>To</th><th>수량</th><th>구간</th><th>매수/매도</th></tr>
+      </thead>
+      <tbody></tbody>
+    </table>
   </div>
 
   <script>
+    // 탭 전환
     function showTab(id) {
-      document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
+      document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
       document.getElementById(id).classList.add('active');
     }
 
+    // 시세 업데이트
     async function updatePrice() {
       const res = await fetch("/api/price");
       const data = await res.json();
@@ -51,6 +70,7 @@
         `HBAR: $${data.HBAR.price.toFixed(4)} (${data.HBAR.change >= 0 ? '+' : ''}${data.HBAR.change}%)`;
     }
 
+    // 차트 생성
     const makeChart = (id, label, unit) => new Chart(document.getElementById(id).getContext('2d'), {
       type: 'line',
       data: {
@@ -73,11 +93,13 @@
       }
     });
 
+    // 차트 정의
     const btcChartCount = makeChart('btcChartCount', 'BTC 거래 건수', '거래 건수');
     const btcChartVolume = makeChart('btcChartVolume', 'BTC 거래량', '거래량');
     const hbarChartCount = makeChart('hbarChartCount', 'HBAR 거래 건수', '거래 건수');
     const hbarChartVolume = makeChart('hbarChartVolume', 'HBAR 거래량', '거래량');
 
+    // 차트 업데이트
     const updateChart = async (url, chartCount, chartVolume) => {
       const res = await fetch(url);
       const data = await res.json();
@@ -92,10 +114,42 @@
       chartVolume.update();
     };
 
+    // 고래 분석 표 업데이트
+    async function updateWhaleTables() {
+      const btcRes = await fetch("/api/btc_trades");
+      const btcData = await btcRes.json();
+      const btcTable = document.querySelector("#btcTable tbody");
+      btcTable.innerHTML = btcData.map(trade => `
+        <tr>
+          <td>${trade.time}</td>
+          <td>${trade.from}</td>
+          <td>${trade.to}</td>
+          <td>${trade.amount}</td>
+          <td>${trade.type}</td>
+          <td>${trade.direction}</td>
+        </tr>
+      `).join("");
+
+      const hbarRes = await fetch("/api/hbar_trades");
+      const hbarData = await hbarRes.json();
+      const hbarTable = document.querySelector("#hbarTable tbody");
+      hbarTable.innerHTML = hbarData.map(trade => `
+        <tr>
+          <td>${trade.time}</td>
+          <td>${trade.from}</td>
+          <td>${trade.to}</td>
+          <td>${trade.amount}</td>
+          <td>${trade.type}</td>
+          <td>${trade.direction}</td>
+        </tr>
+      `).join("");
+    }
+
     function updateAll() {
       updateChart("/api/btc", btcChartCount, btcChartVolume);
       updateChart("/api/hbar", hbarChartCount, hbarChartVolume);
       updatePrice();
+      updateWhaleTables();
     }
 
     updateAll();

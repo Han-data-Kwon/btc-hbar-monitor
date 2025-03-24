@@ -2,7 +2,8 @@ from flask import Flask, render_template, jsonify
 from datetime import datetime
 import pytz
 import random
-import requests  # 🔄 위치 이동 (최상단 import)
+import requests
+import os  # ✅ Render용 포트 설정을 위해 필요
 
 app = Flask(__name__)
 
@@ -50,5 +51,32 @@ def api_hbar():
     if len(hbar_data) > MAX_POINTS:
         hbar_data.pop(0)
     return jsonify(hbar_data)
+
+@app.route("/api/price")
+def api_price():
+    url = "https://api.coingecko.com/api/v3/simple/price"
+    params = {
+        "ids": "bitcoin,hedera-hashgraph",
+        "vs_currencies": "usd",
+        "include_24hr_change": "true"
+    }
+    res = requests.get(url, params=params)
+    data = res.json()
+    return jsonify({
+        "BTC": {
+            "price": round(data["bitcoin"]["usd"], 2),
+            "change": round(data["bitcoin"]["usd_24h_change"], 2)
+        },
+        "HBAR": {
+            "price": round(data["hedera-hashgraph"]["usd"], 4),
+            "change": round(data["hedera-hashgraph"]["usd_24h_change"], 2)
+        }
+    })
+
+if __name__ == "__main__":
+    # ✅ Render가 지정하는 포트 사용
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
+
 
 

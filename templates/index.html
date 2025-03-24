@@ -12,7 +12,28 @@
   <h2>🔵 헤데라 고래 거래량 (최근 30분)</h2>
   <canvas id="hbarChart"></canvas>
 
+  <h3 id="btcPrice">BTC 시세 로딩중...</h3>
+  <canvas id="btcChart"></canvas>
+
+  <h3 id="hbarPrice">HBAR 시세 로딩중...</h3>
+  <canvas id="hbarChart"></canvas>
+
   <script>
+
+async function updatePrice() {
+  const res = await fetch("/api/price");
+  const data = await res.json();
+
+  const btc = data.BTC;
+  const hbar = data.HBAR;
+
+  document.getElementById("btcPrice").innerText =
+    `BTC: $${btc.price.toLocaleString()} (${btc.change >= 0 ? "+" : ""}${btc.change}%)`;
+
+  document.getElementById("hbarPrice").innerText =
+    `HBAR: $${hbar.price.toFixed(4)} (${hbar.change >= 0 ? "+" : ""}${hbar.change}%)`;
+}
+
     const btcCtx = document.getElementById('btcChart').getContext('2d');
     const hbarCtx = document.getElementById('hbarChart').getContext('2d');
 
@@ -65,8 +86,11 @@
       updateChart("/api/hbar", hbarChart);
     };
 
-    updateCharts(); // 최초 실행
-    setInterval(updateCharts, 30000); // ⏱ 30초마다 실행
+    updateCharts();
+    updatePrice(); // 👈 이것 추가
+    setInterval(updateCharts, 30000);
+    setInterval(updatePrice, 30000); // 👈 이것도 추가
+
   </script>
 </body>
 </html>

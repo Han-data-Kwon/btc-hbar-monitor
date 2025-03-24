@@ -11,8 +11,8 @@
     table { border-collapse: collapse; width: 100%; margin-top: 10px; }
     th, td { border: 1px solid #aaa; padding: 6px; text-align: center; font-size: 14px; }
     th { background-color: #f0f0f0; }
-    .buy { color: red; font-weight: bold; }   /* 업비트 스타일: 매수 빨간색 */
-    .sell { color: blue; font-weight: bold; } /* 업비트 스타일: 매도 파란색 */
+    .buy { color: red; font-weight: bold; }
+    .sell { color: blue; font-weight: bold; }
   </style>
 </head>
 <body>
@@ -125,8 +125,8 @@
       const btcKeys = ["0-1", "1-10", "10-100", "100+"];
       btcChartCount.data.labels = btc.map(d => d.time);
       btcKeys.forEach((key, i) => {
-        btcChartCount.data.datasets[i].data = btc.map(d => d.data[key].count);
-        btcChartVolume.data.datasets[i].data = btc.map(d => d.data[key].volume);
+        btcChartCount.data.datasets[i].data = btc.map(d => d.data[key]?.count ?? 0);
+        btcChartVolume.data.datasets[i].data = btc.map(d => d.data[key]?.volume ?? 0);
       });
       btcChartCount.update();
       btcChartVolume.update();
@@ -134,8 +134,8 @@
       const hbarKeys = ["0-1k", "1k-10k", "10k-100k", "100k+"];
       hbarChartCount.data.labels = hbar.map(d => d.time);
       hbarKeys.forEach((key, i) => {
-        hbarChartCount.data.datasets[i].data = hbar.map(d => d.data[key].count);
-        hbarChartVolume.data.datasets[i].data = hbar.map(d => d.data[key].volume);
+        hbarChartCount.data.datasets[i].data = hbar.map(d => d.data[key]?.count ?? 0);
+        hbarChartVolume.data.datasets[i].data = hbar.map(d => d.data[key]?.volume ?? 0);
       });
       hbarChartCount.update();
       hbarChartVolume.update();

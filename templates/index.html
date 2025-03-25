@@ -22,7 +22,7 @@
     <button onclick="showTab('whale')">🐋 고래 분석 보기</button>
   </div>
 
-  <!-- 📊 거래 차트 -->
+  <!-- 📊 거래 차트 탭 -->
   <div id="chart" class="tab active">
     <h2>🟠 비트코인 고래 거래량 (최근 30분)</h2>
     <h3 id="btcPrice">BTC 시세 로딩중...</h3>
@@ -35,7 +35,7 @@
     <canvas id="hbarChartVolume" height="150"></canvas>
   </div>
 
-  <!-- 🐋 고래 분석 -->
+  <!-- 🐋 고래 분석 탭 -->
   <div id="whale" class="tab">
     <h2>🐳 BTC 고래 거래 분석</h2>
     <table id="btcTable">
@@ -69,16 +69,13 @@
         `HBAR: $${data.HBAR.price.toFixed(4)} (${data.HBAR.change >= 0 ? '+' : ''}${data.HBAR.change}%)`;
     }
 
-    const makeChart = (id, unit) => new Chart(document.getElementById(id).getContext('2d'), {
+    const makeChart = (id, keys, unit) => new Chart(document.getElementById(id).getContext('2d'), {
       type: 'line',
       data: {
         labels: [],
-        datasets: [
-          { label: '0-1', data: [], borderWidth: 2 },
-          { label: '1-10', data: [], borderWidth: 2 },
-          { label: '10-100', data: [], borderWidth: 2 },
-          { label: '100+', data: [], borderWidth: 2 }
-        ]
+        datasets: keys.map(label => ({
+          label, data: [], borderWidth: 2
+        }))
       },
       options: {
         responsive: true,
@@ -91,55 +88,26 @@
       }
     });
 
-    const makeHbarChart = (id, unit) => new Chart(document.getElementById(id).getContext('2d'), {
-      type: 'line',
-      data: {
-        labels: [],
-        datasets: [
-          { label: '0-1k', data: [], borderWidth: 2 },
-          { label: '1k-10k', data: [], borderWidth: 2 },
-          { label: '10k-100k', data: [], borderWidth: 2 },
-          { label: '100k+', data: [], borderWidth: 2 }
-        ]
-      },
-      options: {
-        responsive: true,
-        animation: false,
-        plugins: { legend: { position: 'top' } },
-        scales: {
-          x: { title: { display: true, text: '시간 (KST)' } },
-          y: { beginAtZero: true, title: { display: true, text: unit } }
-        }
-      }
-    });
+    const btcKeys = ["0-1", "1-10", "10-100", "100+"];
+    const hbarKeys = ["0-1K", "1K-10K", "10K-100K", "100K+"];
 
-    const btcChartCount = makeChart('btcChartCount', '거래 건수');
-    const btcChartVolume = makeChart('btcChartVolume', '거래량');
-    const hbarChartCount = makeHbarChart('hbarChartCount', '거래 건수');
-    const hbarChartVolume = makeHbarChart('hbarChartVolume', '거래량');
+    const btcChartCount = makeChart('btcChartCount', btcKeys, '거래 건수');
+    const btcChartVolume = makeChart('btcChartVolume', btcKeys, '거래량');
 
-    async function updateCharts() {
-      const btc = await fetch("/api/btc").then(r => r.json());
-      const hbar = await fetch("/api/hbar").then(r => r.json());
+    const hbarChartCount = makeChart('hbarChartCount', hbarKeys, '거래 건수');
+    const hbarChartVolume = makeChart('hbarChartVolume', hbarKeys, '거래량');
 
-      const btcKeys = ["0-1", "1-10", "10-100", "100+"];
-      btcChartCount.data.labels = btc.map(d => d.time);
-      btcKeys.forEach((key, i) => {
-        btcChartCount.data.datasets[i].data = btc.map(d => d.data[key]?.count ?? 0);
-        btcChartVolume.data.datasets[i].data = btc.map(d => d.data[key]?.volume ?? 0);
+    const updateChart = async (url, chartCount, chartVolume, keys) => {
+      const res = await fetch(url);
+      const data = await res.json();
+      chartCount.data.labels = chartVolume.data.labels = data.map(d => d.time);
+      keys.forEach((key, i) => {
+        chartCount.data.datasets[i].data = data.map(d => d.data[key]?.count ?? 0);
+        chartVolume.data.datasets[i].data = data.map(d => d.data[key]?.volume ?? 0);
       });
-      btcChartCount.update();
-      btcChartVolume.update();
-
-      const hbarKeys = ["0-1k", "1k-10k", "10k-100k", "100k+"];
-      hbarChartCount.data.labels = hbar.map(d => d.time);
-      hbarKeys.forEach((key, i) => {
-        hbarChartCount.data.datasets[i].data = hbar.map(d => d.data[key]?.count ?? 0);
-        hbarChartVolume.data.datasets[i].data = hbar.map(d => d.data[key]?.volume ?? 0);
-      });
-      hbarChartCount.update();
-      hbarChartVolume.update();
-    }
+      chartCount.update();
+      chartVolume.update();
+    };
 
     async function updateWhaleTables() {
       const btcRes = await fetch("/api/btc_trades");
@@ -170,7 +138,8 @@
     }
 
     function updateAll() {
-      updateCharts();
+      updateChart("/api/btc", btcChartCount, btcChartVolume, btcKeys);
+      updateChart("/api/hbar", hbarChartCount, hbarChartVolume, hbarKeys);
       updatePrice();
       updateWhaleTables();
     }

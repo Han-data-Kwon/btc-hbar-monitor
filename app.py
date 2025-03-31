@@ -14,6 +14,8 @@ btc_data = []
 hbar_data = []
 btc_trades = []
 hbar_trades = []
+btc_whales = []
+hbar_whales = []
 
 exchange_addresses = {"binance_wallet", "upbit_wallet", "coinbase_wallet"}
 
@@ -68,7 +70,7 @@ def generate_mock_trades(coin="btc"):
             else:
                 type_label = "100+"
 
-        from_addr = random.choice(["user_wallet", "whale_wallet", "random_wallet", "binance_wallet"])
+        from_addr = random.choice(["user_wallet", "whale_wallet", "binance_wallet"])
         to_addr = random.choice(["upbit_wallet", "user_wallet", "coinbase_wallet"])
         direction = "매도" if to_addr in exchange_addresses else "매수"
 
@@ -140,6 +142,8 @@ def api_price():
             "change": round(data["hedera-hashgraph"]["usd_24h_change"], 2)
         }
     })
+
+# ✅ 추가 예정: /api/whale_alert
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))

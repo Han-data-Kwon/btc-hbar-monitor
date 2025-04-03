@@ -1,3 +1,4 @@
+<!-- templates/index.html -->
 <!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -15,41 +16,15 @@
       background-color: #1e1e1e;
       color: white;
     }
-    .top-bar {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    .tabs {
-      margin: 10px 0;
-    }
     button {
       margin: 6px;
-      padding: 8px 16px;
+      padding: 8px 12px;
       font-weight: bold;
-      border-radius: 8px;
-      border: 1px solid #ccc;
       cursor: pointer;
     }
     .tab { display: none; }
     .tab.active { display: block; }
-    .card {
-      border: 1px solid #ccc;
-      border-radius: 12px;
-      padding: 16px;
-      margin: 10px;
-      display: inline-block;
-      width: 200px;
-      vertical-align: top;
-    }
-    .buy { color: red; font-weight: bold; }
-    .sell { color: blue; font-weight: bold; }
-    .highlight { background-color: yellow; font-weight: bold; }
-    table {
-      border-collapse: collapse;
-      width: 100%;
-      margin-top: 10px;
-    }
+    table { border-collapse: collapse; width: 100%; margin-top: 10px; }
     th, td {
       border: 1px solid #ccc;
       padding: 6px;
@@ -57,36 +32,58 @@
       font-size: 14px;
     }
     th { background-color: #f0f0f0; }
-    .dark-mode th { background-color: #333; }
-    .news-card {
+    .dark-mode th { background-color: #444; }
+    .buy { color: red; font-weight: bold; }
+    .sell { color: blue; font-weight: bold; }
+    .highlight { background-color: yellow; font-weight: bold; }
+    .card-container {
+      display: flex;
+      gap: 20px;
+      flex-wrap: wrap;
+      margin-top: 20px;
+    }
+    .card {
+      border: 1px solid #ccc;
+      padding: 20px;
+      border-radius: 12px;
+      width: 200px;
+      box-shadow: 2px 2px 6px rgba(0,0,0,0.1);
+    }
+    .news-item {
       display: inline-block;
       width: 300px;
-      margin: 10px;
+      margin-right: 12px;
       vertical-align: top;
     }
-    .news-card img {
+    .news-item img {
       width: 100%;
-      height: 150px;
-      object-fit: cover;
-      border-radius: 8px;
+      height: auto;
+      border-radius: 6px;
+      margin-top: 6px;
+    }
+    .top-right {
+      position: absolute;
+      right: 20px;
+      top: 20px;
     }
   </style>
 </head>
 <body>
-  <div class="top-bar">
-    <div class="tabs">
-      <button onclick="showTab('price')">💰 시세</button>
-      <button onclick="showTab('news')">📰 뉴스</button>
-      <button onclick="showTab('econ')">📊 경제지표</button>
-      <button onclick="showTab('whales')">🐋 고래 거래</button>
-    </div>
-    <button onclick="toggleDarkMode()">🌙 다크모드</button>
+  <h1>🐋 고래 모니터링 대시보드</h1>
+
+  <!-- 탭 -->
+  <div>
+    <button onclick="showTab('price')">💰 시세</button>
+    <button onclick="showTab('news')">📰 뉴스</button>
+    <button onclick="showTab('econ')">📊 경제지표</button>
+    <button onclick="showTab('whales')">🐳 고래 거래</button>
+    <button class="top-right" onclick="toggleDarkMode()">🌙 다크모드</button>
   </div>
 
   <!-- 💰 시세 -->
   <div id="price" class="tab active">
     <h2>💰 주요 코인 시세</h2>
-    <div id="priceCards"></div>
+    <div id="priceCards" class="card-container"></div>
   </div>
 
   <!-- 📰 뉴스 -->
@@ -106,21 +103,17 @@
     </table>
   </div>
 
-  <!-- 🐋 고래 거래 -->
+  <!-- 🐳 고래 거래 -->
   <div id="whales" class="tab">
     <h2>🐳 BTC 고래 거래</h2>
     <table>
-      <thead>
-        <tr><th>시간</th><th>From</th><th>To</th><th>수량</th><th>구간</th><th>방향</th></tr>
-      </thead>
+      <thead><tr><th>시간</th><th>From</th><th>To</th><th>수량</th><th>구간</th><th>방향</th></tr></thead>
       <tbody id="btcTable"></tbody>
     </table>
 
     <h2>🧊 HBAR 고래 거래</h2>
     <table>
-      <thead>
-        <tr><th>시간</th><th>From</th><th>To</th><th>수량</th><th>구간</th><th>방향</th></tr>
-      </thead>
+      <thead><tr><th>시간</th><th>From</th><th>To</th><th>수량</th><th>구간</th><th>방향</th></tr></thead>
       <tbody id="hbarTable"></tbody>
     </table>
   </div>
@@ -143,7 +136,7 @@
         el.innerHTML = Object.keys(data).map(key => `
           <div class="card">
             <h3>${key}</h3>
-            <p><span style="color:green;">$</span> ${data[key].price.toLocaleString()} USD</p>
+            <p style="color:green;">💲 ${data[key].price.toLocaleString()} USD</p>
             <p>📉 변화율: ${data[key].change}%</p>
           </div>
         `).join('');
@@ -157,10 +150,10 @@
       const news = await res.json();
       const el = document.getElementById("newsList");
       el.innerHTML = news.map(n => `
-        <div class="news-card">
+        <div class="news-item">
           <a href="${n.link}" target="_blank"><strong>${n.title}</strong></a><br/>
-          <small>발행일: ${n.date}</small>
-          <img src="${n.image}" alt="news image"/>
+          발행일: ${n.date}
+          ${n.image ? `<img src="${n.image}" alt="뉴스 이미지">` : ""}
         </div>
       `).join('');
     }
@@ -174,9 +167,9 @@
           <td>${e.date}</td>
           <td>${e.event}</td>
           <td>${e.country}</td>
-          <td>${e.previous}</td>
-          <td>${e.forecast}</td>
-          <td>${e.actual}</td>
+          <td>${e.previous ?? "-"}</td>
+          <td>${e.forecast ?? "-"}</td>
+          <td>${e.actual ?? "-"}</td>
           <td>${e.effect}</td>
         </tr>
       `).join('');

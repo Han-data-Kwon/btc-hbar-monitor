@@ -14,29 +14,33 @@ app = Flask(__name__)
 @app.route("/api/price")
 def api_price():
     try:
-        res = requests.get("https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,hedera-hashgraph,ripple&vs_currencies=usd&include_24hr_change=true").json()
+        url = "https://api.coingecko.com/api/v3/simple/price"
+        params = {
+            "ids": "bitcoin,ethereum,hedera-hashgraph,ripple",
+            "vs_currencies": "usd",
+            "include_24hr_change": "true"
+        }
+        res = requests.get(url, params=params).json()
         print("시세 응답 구조:", res)
+
+        def safe_get(data, key):
+            return round(data.get(key, {}).get("usd", 0), 2), round(data.get(key, {}).get("usd_24h_change", 0), 2)
+
+        btc_price, btc_change = safe_get(res, "bitcoin")
+        eth_price, eth_change = safe_get(res, "ethereum")
+        hbar_price, hbar_change = safe_get(res, "hedera-hashgraph")
+        xrp_price, xrp_change = safe_get(res, "ripple")
+
         return jsonify({
-            "BTC": {
-                "price": round(res["bitcoin"]["usd"], 2),
-                "change": round(res["bitcoin"]["usd_24h_change"], 2),
-            },
-            "ETH": {
-                "price": round(res["ethereum"]["usd"], 2),
-                "change": round(res["ethereum"]["usd_24h_change"], 2),
-            },
-            "HBAR": {
-                "price": round(res["hedera-hashgraph"]["usd"], 2),
-                "change": round(res["hedera-hashgraph"]["usd_24h_change"], 2),
-            },
-            "XRP": {
-                "price": round(res["ripple"]["usd"], 2),
-                "change": round(res["ripple"]["usd_24h_change"], 2),
-            },
+            "BTC": {"price": btc_price, "change": btc_change},
+            "ETH": {"price": eth_price, "change": eth_change},
+            "HBAR": {"price": hbar_price, "change": hbar_change},
+            "XRP": {"price": xrp_price, "change": xrp_change},
         })
     except Exception as e:
         print("시세 API 오류:", e)
         return jsonify({})
+
 
 # --- 뉴스 API ---
 @app.route("/api/news")
@@ -53,12 +57,19 @@ def api_news():
         })
     return jsonify(articles)
 
+
 # --- 경제지표 API ---
 @app.route("/api/economics")
 def api_economics():
     try:
         key = os.environ.get("TRADING_API_KEY", "")
+        if not key:
+            raise ValueError("TRADING_API_KEY 환경변수가 없습니다")
+
         res = requests.get(f"https://api.tradingeconomics.com/calendar?c={key}").json()
+        if not isinstance(res, list):
+            raise ValueError("API 응답이 리스트가 아닙니다")
+
         filtered = [
             {
                 "date": d.get("date", "")[:10],
@@ -71,13 +82,15 @@ def api_economics():
             }
             for d in res if d.get("importance") == "High"
         ]
+
         sorted_data = sorted(filtered, key=lambda x: x["date"], reverse=True)
+
         result = [
             {
                 "date": d["date"],
                 "event": d["event"],
                 "country": d["country"],
-                "effect": "시장 영향 높음" if d["importance"] == "High" else "시장 영향 낮음",
+                "effect": "시장 영향 높음",
                 "actual": d["actual"],
                 "forecast": d["forecast"],
                 "previous": d["previous"]
@@ -88,6 +101,7 @@ def api_economics():
     except Exception as e:
         print("경제지표 API 오류:", e)
         return jsonify([])
+
 
 # --- 고래 거래 MOCK ---
 def generate_mock_trades(coin):
@@ -105,6 +119,7 @@ def generate_mock_trades(coin):
         trades.append(trade)
     return trades
 
+
 def classify_trade_type(amount, coin):
     if coin == "btc":
         if amount < 1: return "0–1"
@@ -117,19 +132,23 @@ def classify_trade_type(amount, coin):
         elif amount < 100000: return "10K–100K"
         else: return "100K+"
 
+
 @app.route("/api/btc_trades")
 def api_btc_trades():
     trades = generate_mock_trades("btc")
     return jsonify(trades)
+
 
 @app.route("/api/hbar_trades")
 def api_hbar_trades():
     trades = generate_mock_trades("hbar")
     return jsonify(trades)
 
+
 @app.route("/")
 def index():
     return render_template("index.html")
+
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))

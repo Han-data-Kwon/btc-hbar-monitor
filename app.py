@@ -1,49 +1,49 @@
 import os
-import requests
 import random
+import requests
 from flask import Flask, render_template, jsonify
 from datetime import datetime
 from dotenv import load_dotenv
 import feedparser
 
 load_dotenv()
-
 app = Flask(__name__)
 
-# ---------------- 시세 API ----------------
+# 주요 코인 시세
 @app.route("/api/price")
 def api_price():
     try:
-        url = "https://api.coingecko.com/api/v3/simple/price"
-        params = {
-            "ids": "bitcoin,ethereum,hedera-hashgraph,ripple",
-            "vs_currencies": "usd",
-            "include_24hr_change": "true"
-        }
-        res = requests.get(url, params=params).json()
+        res = requests.get(
+            "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,hedera-hashgraph,ripple&vs_currencies=usd&include_24hr_change=true"
+        ).json()
         return jsonify({
             "BTC": {
-                "price": round(res.get("bitcoin", {}).get("usd", 0), 2),
+                "price": round(res.get("bitcoin", {}).get("usd", 0)),
                 "change": round(res.get("bitcoin", {}).get("usd_24h_change", 0), 2),
             },
             "ETH": {
-                "price": round(res.get("ethereum", {}).get("usd", 0), 2),
+                "price": round(res.get("ethereum", {}).get("usd", 0)),
                 "change": round(res.get("ethereum", {}).get("usd_24h_change", 0), 2),
             },
             "HBAR": {
-                "price": round(res.get("hedera-hashgraph", {}).get("usd", 0), 2),
+                "price": round(res.get("hedera-hashgraph", {}).get("usd", 0)),
                 "change": round(res.get("hedera-hashgraph", {}).get("usd_24h_change", 0), 2),
             },
             "XRP": {
-                "price": round(res.get("ripple", {}).get("usd", 0), 2),
+                "price": round(res.get("ripple", {}).get("usd", 0)),
                 "change": round(res.get("ripple", {}).get("usd_24h_change", 0), 2),
-            },
+            }
         })
     except Exception as e:
         print("시세 API 오류:", e)
-        return jsonify({})
+        return jsonify({
+            "BTC": {"price": 0, "change": 0},
+            "ETH": {"price": 0, "change": 0},
+            "HBAR": {"price": 0, "change": 0},
+            "XRP": {"price": 0, "change": 0}
+        })
 
-# ---------------- 뉴스 API ----------------
+# 뉴스
 @app.route("/api/news")
 def api_news():
     feed = feedparser.parse("https://cointelegraph.com/rss")
@@ -54,16 +54,35 @@ def api_news():
             "link": entry.link,
             "date": entry.published,
             "summary": entry.summary,
-            "image": entry.get("media_content", [{}])[0].get("url", "") if entry.get("media_content") else ""
+            "image": entry.get("media_content", [{}])[0].get("url", "")
         })
     return jsonify(articles)
 
-# ---------------- 경제지표 API (보류 상태) ----------------
+# 경제지표
 @app.route("/api/economics")
 def api_economics():
-    return jsonify([])  # TradingEconomics API 비활성화 상태. 나중에 다른 API로 대체 예정.
+    try:
+        key = os.environ.get("TRADING_API_KEY", "")
+        res = requests.get(f"https://api.tradingeconomics.com/calendar?c={key}").json()
+        filtered = [
+            {
+                "date": d.get("date", "")[:10],
+                "event": d.get("event", ""),
+                "country": d.get("country", ""),
+                "actual": d.get("actual"),
+                "forecast": d.get("forecast"),
+                "previous": d.get("previous"),
+                "importance": d.get("importance"),
+            }
+            for d in res if d.get("importance") == "High"
+        ]
+        sorted_data = sorted(filtered, key=lambda x: x["date"], reverse=True)
+        return jsonify(sorted_data[:15])
+    except Exception as e:
+        print("경제지표 API 오류:", e)
+        return jsonify([])
 
-# ---------------- 고래 거래 MOCK ----------------
+# 고래 매집 데이터 (모의)
 def generate_mock_trades(coin):
     trades = []
     for _ in range(10):
@@ -99,7 +118,6 @@ def api_btc_trades():
 def api_hbar_trades():
     return jsonify(generate_mock_trades("hbar"))
 
-# ---------------- 루트 ----------------
 @app.route("/")
 def index():
     return render_template("index.html")

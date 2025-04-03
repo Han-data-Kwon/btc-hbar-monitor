@@ -2,181 +2,179 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8">
-  <title>📈 실시간 고래 거래량 (30초 단위 / 한국시간)</title>
+  <title>📈 고래 거래 & 주요 정보 대시보드</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
-    .tab { display: none; }
-    .tab.active { display: block; }
-    button { margin: 10px; padding: 8px 16px; font-weight: bold; }
-    table { border-collapse: collapse; width: 100%; margin-top: 10px; }
-    th, td { border: 1px solid #aaa; padding: 6px; text-align: center; font-size: 14px; }
-    th { background-color: #f0f0f0; }
-    .buy { color: red; font-weight: bold; }
-    .sell { color: blue; font-weight: bold; }
-    .exchange { background-color: #fffbcc; font-weight: bold; }
-    .scorecard { display: flex; gap: 30px; margin: 15px 0; }
-    .scorebox { padding: 10px 20px; border: 1px solid #ccc; border-radius: 6px; background: #f9f9f9; font-size: 16px; font-weight: bold; }
-    .summary { margin: 15px 0; font-size: 15px; font-weight: bold; }
+    body {
+      font-family: 'Arial';
+      margin: 0;
+      padding: 20px;
+      background-color: #fff;
+      color: #000;
+      transition: background 0.3s, color 0.3s;
+    }
+    .dark-mode {
+      background-color: #1c1c1c;
+      color: #f0f0f0;
+    }
+    .tab-btns button {
+      margin-right: 10px;
+      padding: 10px 20px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    .tab-content { display: none; margin-top: 20px; }
+    .tab-content.active { display: block; }
+
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
+    .card {
+      background: #f9f9f9;
+      padding: 12px;
+      border-radius: 10px;
+      border: 1px solid #ccc;
+      transition: background 0.3s;
+    }
+    .dark-mode .card {
+      background: #2e2e2e;
+      border-color: #555;
+    }
+    canvas.sparkline { height: 40px !important; }
+
+    .rsi { font-weight: bold; }
+    .high { color: red; }
+    .low { color: blue; }
+    .neutral { color: gray; }
+
+    table { width: 100%; border-collapse: collapse; font-size: 14px; margin-top: 10px; }
+    th, td { border: 1px solid #aaa; padding: 6px; text-align: center; }
+    th { background-color: #eee; }
+    .dark-mode th { background-color: #444; }
+    a { text-decoration: none; color: #0645AD; }
+
+    #toggleMode { position: fixed; top: 15px; right: 15px; padding: 6px 12px; }
   </style>
 </head>
 <body>
 
-  <div>
-    <button onclick="showTab('chart')">📊 거래 차트 보기</button>
-    <button onclick="showTab('whale')">🐋 고래 분석 보기</button>
+  <!-- 테마 전환 -->
+  <button id="toggleMode">🌙 다크모드</button>
+
+  <!-- 탭 버튼 -->
+  <div class="tab-btns">
+    <button onclick="switchTab('indicators')">📊 코인 지표</button>
+    <button onclick="switchTab('news')">📰 뉴스</button>
+    <button onclick="switchTab('econ')">📅 경제지표</button>
   </div>
 
-  <!-- 📊 거래 차트 탭 -->
-  <div id="chart" class="tab active">
-    <h2>🟠 비트코인 고래 거래량 (최근 30분)</h2>
-    <h3 id="btcPrice">BTC 시세 로딩중...</h3>
-    <div class="scorecard">
-      <div class="scorebox" id="btcBuy">매수: -</div>
-      <div class="scorebox" id="btcSell">매도: -</div>
-    </div>
-    <canvas id="btcChartCount" height="150"></canvas>
-    <canvas id="btcChartVolume" height="150"></canvas>
-
-    <h2>🔵 헤데라 고래 거래량 (최근 30분)</h2>
-    <h3 id="hbarPrice">HBAR 시세 로딩중...</h3>
-    <div class="scorecard">
-      <div class="scorebox" id="hbarBuy">매수: -</div>
-      <div class="scorebox" id="hbarSell">매도: -</div>
-    </div>
-    <canvas id="hbarChartCount" height="150"></canvas>
-    <canvas id="hbarChartVolume" height="150"></canvas>
+  <!-- 탭 1: 지표 -->
+  <div id="indicators" class="tab-content active">
+    <h2>📊 주요 코인 지표</h2>
+    <div class="grid" id="indicatorCards"></div>
   </div>
 
-  <!-- 🐋 고래 분석 탭 -->
-  <div id="whale" class="tab">
-    <div class="summary" id="btcSummary">BTC 거래 요약</div>
-    <table id="btcTable">
-      <thead>
-        <tr><th>시간</th><th>From</th><th>To</th><th>수량</th><th>구간</th><th>매수/매도</th></tr>
-      </thead>
-      <tbody></tbody>
-    </table>
+  <!-- 탭 2: 뉴스 -->
+  <div id="news" class="tab-content">
+    <h2>📰 Cointelegraph 뉴스</h2>
+    <div id="newsList"></div>
+  </div>
 
-    <div class="summary" id="hbarSummary">HBAR 거래 요약</div>
-    <table id="hbarTable">
+  <!-- 탭 3: 경제지표 -->
+  <div id="econ" class="tab-content">
+    <h2>📅 중요 경제 지표</h2>
+    <table>
       <thead>
-        <tr><th>시간</th><th>From</th><th>To</th><th>수량</th><th>구간</th><th>매수/매도</th></tr>
+        <tr><th>지표명</th><th>국가</th><th>실제</th><th>예상</th><th>이전</th><th>날짜</th></tr>
       </thead>
-      <tbody></tbody>
+      <tbody id="econTable"></tbody>
     </table>
   </div>
 
   <script>
-    function showTab(id) {
-      document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
-      document.getElementById(id).classList.add('active');
+    // 탭 전환
+    function switchTab(id) {
+      document.querySelectorAll(".tab-content").forEach(tab => tab.classList.remove("active"));
+      document.getElementById(id).classList.add("active");
     }
 
-    async function updatePrice() {
-      const res = await fetch("/api/price");
-      const data = await res.json();
-      document.getElementById("btcPrice").innerText =
-        `BTC: $${data.BTC.price.toLocaleString()} (${data.BTC.change >= 0 ? '+' : ''}${data.BTC.change}%)`;
-      document.getElementById("hbarPrice").innerText =
-        `HBAR: $${data.HBAR.price.toFixed(4)} (${data.HBAR.change >= 0 ? '+' : ''}${data.HBAR.change}%)`;
-    }
-
-    const makeChart = (id, keys, unit) => new Chart(document.getElementById(id).getContext('2d'), {
-      type: 'line',
-      data: {
-        labels: [],
-        datasets: keys.map(label => ({
-          label, data: [], borderWidth: 2
-        }))
-      },
-      options: {
-        responsive: true,
-        animation: false,
-        plugins: { legend: { position: 'top' } },
-        scales: {
-          x: { title: { display: true, text: '시간 (KST)' } },
-          y: { beginAtZero: true, title: { display: true, text: unit } }
-        }
-      }
-    });
-
-    const btcKeys = ["0-1", "1-10", "10-100", "100+"];
-    const hbarKeys = ["0-1K", "1K-10K", "10K-100K", "100K+"];
-
-    const btcChartCount = makeChart('btcChartCount', btcKeys, '거래 건수');
-    const btcChartVolume = makeChart('btcChartVolume', btcKeys, '거래량');
-    const hbarChartCount = makeChart('hbarChartCount', hbarKeys, '거래 건수');
-    const hbarChartVolume = makeChart('hbarChartVolume', hbarKeys, '거래량');
-
-    const updateChart = async (url, chartCount, chartVolume, keys) => {
-      const res = await fetch(url);
-      const data = await res.json();
-      chartCount.data.labels = chartVolume.data.labels = data.map(d => d.time);
-      keys.forEach((key, i) => {
-        chartCount.data.datasets[i].data = data.map(d => d.data[key]?.count ?? 0);
-        chartVolume.data.datasets[i].data = data.map(d => d.data[key]?.volume ?? 0);
-      });
-      chartCount.update();
-      chartVolume.update();
+    // 다크모드 토글
+    document.getElementById("toggleMode").onclick = () => {
+      document.body.classList.toggle("dark-mode");
     };
 
-    async function updateWhaleTables() {
-      const btcRes = await fetch("/api/btc_trades");
-      const btcData = await btcRes.json();
-      const btcTbody = document.querySelector("#btcTable tbody");
-      btcTbody.innerHTML = btcData.map(trade => `
+    // 지표 표시
+    async function loadIndicators() {
+      const res = await fetch("/api/indicators");
+      const data = await res.json();
+      const wrap = document.getElementById("indicatorCards");
+
+      wrap.innerHTML = "";
+      for (const [coin, d] of Object.entries(data)) {
+        const canvasId = `spark-${coin}`;
+        let rsiColor = d.rsi >= 70 ? "high" : d.rsi <= 30 ? "low" : "neutral";
+
+        wrap.innerHTML += `
+          <div class="card">
+            <h3>${coin}</h3>
+            <p>가격: $${d.price.toLocaleString()}</p>
+            <p>24H: ${d.change >= 0 ? '+' : ''}${d.change}%</p>
+            <p class="rsi ${rsiColor}">RSI: ${d.rsi}</p>
+            <canvas class="sparkline" id="${canvasId}"></canvas>
+          </div>
+        `;
+
+        setTimeout(() => {
+          new Chart(document.getElementById(canvasId).getContext("2d"), {
+            type: 'line',
+            data: {
+              labels: d.spark.map((_, i) => i),
+              datasets: [{
+                data: d.spark,
+                borderWidth: 1,
+                pointRadius: 0,
+                fill: false,
+                tension: 0.3
+              }]
+            },
+            options: {
+              responsive: true,
+              plugins: { legend: { display: false } },
+              scales: { x: { display: false }, y: { display: false } }
+            }
+          });
+        }, 100);
+      }
+    }
+
+    async function loadNews() {
+      const res = await fetch("/api/news");
+      const data = await res.json();
+      const wrap = document.getElementById("newsList");
+      wrap.innerHTML = data.map(n => `
+        <div class="card" style="margin-bottom:10px">
+          <a href="${n.link}" target="_blank"><strong>${n.title}</strong></a><br/>
+          <small>발행일: ${n.published}</small>
+        </div>
+      `).join("");
+    }
+
+    async function loadEcon() {
+      const res = await fetch("/api/econ");
+      const data = await res.json();
+      const wrap = document.getElementById("econTable");
+      wrap.innerHTML = data.map(d => `
         <tr>
-          <td>${trade.time}</td>
-          <td class="${isExchange(trade.from)}">${trade.from}</td>
-          <td class="${isExchange(trade.to)}">${trade.to}</td>
-          <td>${trade.amount}</td>
-          <td>${trade.type}</td>
-          <td class="${trade.direction === '매수' ? 'buy' : 'sell'}">${trade.direction}</td>
+          <td>${d.name}</td><td>${d.country}</td><td>${d.actual}</td>
+          <td>${d.forecast}</td><td>${d.previous}</td><td>${d.date}</td>
         </tr>
       `).join("");
-
-      const hbarRes = await fetch("/api/hbar_trades");
-      const hbarData = await hbarRes.json();
-      const hbarTbody = document.querySelector("#hbarTable tbody");
-      hbarTbody.innerHTML = hbarData.map(trade => `
-        <tr>
-          <td>${trade.time}</td>
-          <td class="${isExchange(trade.from)}">${trade.from}</td>
-          <td class="${isExchange(trade.to)}">${trade.to}</td>
-          <td>${trade.amount}</td>
-          <td>${trade.type}</td>
-          <td class="${trade.direction === '매수' ? 'buy' : 'sell'}">${trade.direction}</td>
-        </tr>
-      `).join("");
-
-      updateSummary("btc", btcData);
-      updateSummary("hbar", hbarData);
     }
 
-    function isExchange(addr) {
-      return addr.includes("wallet") && addr.includes("binance") || addr.includes("upbit") || addr.includes("coinbase")
-        ? "exchange" : "";
+    function loadAll() {
+      loadIndicators(); loadNews(); loadEcon();
     }
 
-    function updateSummary(coin, trades) {
-      const total = trades.length;
-      const whales = trades.filter(t => ["100+", "100K+"].includes(t.type)).length;
-      const buys = trades.filter(t => t.direction === "매수").reduce((acc, t) => acc + t.amount, 0);
-      const sells = trades.filter(t => t.direction === "매도").reduce((acc, t) => acc + t.amount, 0);
-      document.getElementById(`${coin}Buy`).innerText = `매수: ${buys.toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
-      document.getElementById(`${coin}Sell`).innerText = `매도: ${sells.toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
-      document.getElementById(`${coin}Summary`).innerText = `${coin.toUpperCase()} 전체 거래: ${total}건 / 고래 비율: ${((whales / total) * 100).toFixed(1)}%`;
-    }
-
-    function updateAll() {
-      updateChart("/api/btc", btcChartCount, btcChartVolume, btcKeys);
-      updateChart("/api/hbar", hbarChartCount, hbarChartVolume, hbarKeys);
-      updatePrice();
-      updateWhaleTables();
-    }
-
-    updateAll();
-    setInterval(updateAll, 30000);
+    loadAll();
+    setInterval(loadAll, 30000);
   </script>
 </body>
 </html>

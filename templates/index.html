@@ -1,136 +1,210 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-  <meta charset="UTF-8" />
-  <title>📈 실시간 고래 모니터링 대시보드</title>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <meta charset="UTF-8">
+  <title>고래 모니터링 대시보드</title>
   <style>
-    body { font-family: Arial; background: #fff; color: #000; margin: 20px; }
-    .tab { display: none; }
-    .tab.active { display: block; }
-    button { margin: 5px 5px 15px 0; padding: 8px 16px; font-weight: bold; }
-    .card { border: 1px solid #ccc; border-radius: 6px; padding: 10px; margin-bottom: 12px; background: #f7f7f7; }
-    table { border-collapse: collapse; width: 100%; margin-top: 10px; font-size: 14px; }
-    th, td { border: 1px solid #ccc; padding: 6px; text-align: center; }
-    th { background: #eee; }
-    .buy { color: red; font-weight: bold; }
-    .sell { color: blue; font-weight: bold; }
+    body {
+      font-family: 'Arial', sans-serif;
+      background-color: white;
+      color: black;
+      transition: background-color 0.3s, color 0.3s;
+    }
+    .dark-mode {
+      background-color: #1e1e1e;
+      color: white;
+    }
+    .tab {
+      display: none;
+    }
+    .tab.active {
+      display: block;
+    }
+    button {
+      padding: 8px 16px;
+      margin: 10px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      margin-top: 10px;
+    }
+    th, td {
+      border: 1px solid #aaa;
+      padding: 8px;
+      text-align: center;
+    }
+    th {
+      background-color: #f0f0f0;
+    }
+    .buy {
+      color: red;
+      font-weight: bold;
+    }
+    .sell {
+      color: blue;
+      font-weight: bold;
+    }
+    .card {
+      display: inline-block;
+      border: 1px solid #aaa;
+      border-radius: 5px;
+      padding: 10px;
+      margin: 8px;
+      min-width: 120px;
+      text-align: center;
+    }
+    .news-item {
+      background: #f9f9f9;
+      padding: 10px;
+      margin: 10px 0;
+      border-radius: 4px;
+    }
   </style>
 </head>
 <body>
+  <h1>🐋 고래 모니터링 대시보드</h1>
 
-<h1>🐋 고래 모니터링 대시보드</h1>
+  <!-- 메뉴 -->
+  <div>
+    <button onclick="showTab('price')">💰 시세</button>
+    <button onclick="showTab('news')">📰 뉴스</button>
+    <button onclick="showTab('economic')">📅 경제지표</button>
+    <button onclick="showTab('whales')">🐳 고래 거래</button>
+    <button onclick="toggleDarkMode()">🌙 다크모드</button>
+  </div>
 
-<!-- 탭 버튼 -->
-<div>
-  <button onclick="showTab('price')">💰 시세</button>
-  <button onclick="showTab('news')">📰 뉴스</button>
-  <button onclick="showTab('economic')">📅 경제지표</button>
-  <button onclick="showTab('whale')">🐳 고래 거래</button>
-</div>
+  <!-- 시세 탭 -->
+  <div id="price" class="tab active">
+    <h2>💰 실시간 시세</h2>
+    <div id="priceCards"></div>
+  </div>
 
-<!-- 시세 탭 -->
-<div id="price" class="tab active">
-  <h2>💰 실시간 시세</h2>
-  <div id="priceCards"></div>
-</div>
+  <!-- 뉴스 탭 -->
+  <div id="news" class="tab">
+    <h2>📰 Cointelegraph 뉴스</h2>
+    <div id="newsList"></div>
+  </div>
 
-<!-- 뉴스 탭 -->
-<div id="news" class="tab">
-  <h2>📰 코인 뉴스 요약</h2>
-  <div id="newsList"></div>
-</div>
+  <!-- 경제지표 탭 -->
+  <div id="economic" class="tab">
+    <h2>📅 주요 경제지표</h2>
+    <table>
+      <thead>
+        <tr><th>날짜</th><th>지표명</th><th>국가</th><th>해석</th></tr>
+      </thead>
+      <tbody id="econTable"></tbody>
+    </table>
+  </div>
 
-<!-- 경제지표 탭 -->
-<div id="economic" class="tab">
-  <h2>📅 주요 경제지표</h2>
-  <table>
-    <thead><tr><th>날짜</th><th>지표명</th><th>국가</th><th>해석</th></tr></thead>
-    <tbody id="economicTable"></tbody>
-  </table>
-</div>
+  <!-- 고래 거래 탭 -->
+  <div id="whales" class="tab">
+    <h2>🐳 BTC 고래 거래</h2>
+    <table id="btcTable">
+      <thead>
+        <tr><th>시간</th><th>From</th><th>To</th><th>수량</th><th>구간</th><th>매수/매도</th></tr>
+      </thead>
+      <tbody></tbody>
+    </table>
 
-<!-- 고래 분석 탭 -->
-<div id="whale" class="tab">
-  <h2>🐳 BTC 고래 거래</h2>
-  <table>
-    <thead><tr><th>시간</th><th>From</th><th>To</th><th>수량</th><th>구간</th><th>매수/매도</th></tr></thead>
-    <tbody id="btcTable"></tbody>
-  </table>
-  <h2>🧊 HBAR 고래 거래</h2>
-  <table>
-    <thead><tr><th>시간</th><th>From</th><th>To</th><th>수량</th><th>구간</th><th>매수/매도</th></tr></thead>
-    <tbody id="hbarTable"></tbody>
-  </table>
-</div>
+    <h2>🧊 HBAR 고래 거래</h2>
+    <table id="hbarTable">
+      <thead>
+        <tr><th>시간</th><th>From</th><th>To</th><th>수량</th><th>구간</th><th>매수/매도</th></tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
 
-<script>
-function showTab(tabId) {
-  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-  document.getElementById(tabId).classList.add('active');
-}
+  <script>
+    function showTab(id) {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.getElementById(id).classList.add('active');
+    }
 
-async function loadPrices() {
-  const res = await fetch("/api/price");
-  const data = await res.json();
-  const wrap = document.getElementById("priceCards");
-  wrap.innerHTML = Object.entries(data).map(([key, d]) => `
-    <div class="card">
-      <h3>${key}</h3>
-      <p>가격: $${d.price.toLocaleString()}</p>
-      <p>24시간 변동률: ${d.change >= 0 ? '+' : ''}${d.change}%</p>
-    </div>
-  `).join('');
-}
+    function toggleDarkMode() {
+      document.body.classList.toggle("dark-mode");
+    }
 
-async function loadNews() {
-  const res = await fetch("/api/news");
-  const news = await res.json();
-  document.getElementById("newsList").innerHTML = news.map(n => `
-    <div class="card">
-      <a href="${n.link}" target="_blank"><strong>${n.title}</strong></a><br>
-      <small>🕒 ${n.published}</small>
-    </div>
-  `).join('');
-}
+    async function loadPrices() {
+      const res = await fetch("/api/price");
+      const data = await res.json();
+      const cards = Object.entries(data).map(([coin, val]) => `
+        <div class="card">
+          <h3>${coin}</h3>
+          <div>$${val.price.toLocaleString()}</div>
+          <div style="color:${val.change >= 0 ? 'red' : 'blue'}">
+            ${val.change >= 0 ? '+' : ''}${val.change}%
+          </div>
+        </div>
+      `).join('');
+      document.getElementById("priceCards").innerHTML = cards;
+    }
 
-async function loadEconomic() {
-  const res = await fetch("/api/economics");
-  const data = await res.json();
-  document.getElementById("economicTable").innerHTML = data.map(e => `
-    <tr><td>${e.date}</td><td>${e.event}</td><td>${e.country}</td><td>${e.impact}</td></tr>
-  `).join('');
-}
+    async function loadNews() {
+      const res = await fetch("/api/news");
+      const data = await res.json();
+      document.getElementById("newsList").innerHTML = data.map(n => `
+        <div class="news-item">
+          <a href="${n.link}" target="_blank"><strong>${n.title}</strong></a><br>
+          <small>발행일: ${n.pubDate}</small>
+        </div>
+      `).join('');
+    }
 
-async function loadWhales() {
-  const btc = await fetch("/api/btc_trades").then(r => r.json());
-  const hbar = await fetch("/api/hbar_trades").then(r => r.json());
+    async function loadEconomic() {
+      const res = await fetch("/api/economics");
+      const data = await res.json();
+      document.getElementById("econTable").innerHTML = data.map(e => `
+        <tr>
+          <td>${e.date}</td>
+          <td>${e.name}</td>
+          <td>${e.country}</td>
+          <td>${e.interpretation}</td>
+        </tr>
+      `).join('');
+    }
 
-  document.getElementById("btcTable").innerHTML = btc.map(t => `
-    <tr>
-      <td>${t.time}</td><td>${t.from}</td><td>${t.to}</td><td>${t.amount}</td><td>${t.type}</td>
-      <td class="${t.direction === '매수' ? 'buy' : 'sell'}">${t.direction}</td>
-    </tr>
-  `).join('');
+    async function loadWhaleTrades() {
+      const btcRes = await fetch("/api/btc_trades");
+      const btcData = await btcRes.json();
+      const hbarRes = await fetch("/api/hbar_trades");
+      const hbarData = await hbarRes.json();
 
-  document.getElementById("hbarTable").innerHTML = hbar.map(t => `
-    <tr>
-      <td>${t.time}</td><td>${t.from}</td><td>${t.to}</td><td>${t.amount}</td><td>${t.type}</td>
-      <td class="${t.direction === '매수' ? 'buy' : 'sell'}">${t.direction}</td>
-    </tr>
-  `).join('');
-}
+      document.querySelector("#btcTable tbody").innerHTML = btcData.map(t => `
+        <tr>
+          <td>${t.time}</td>
+          <td>${t.from}</td>
+          <td>${t.to}</td>
+          <td>${t.amount}</td>
+          <td>${t.type}</td>
+          <td class="${t.direction === '매수' ? 'buy' : 'sell'}">${t.direction}</td>
+        </tr>
+      `).join('');
 
-function loadAll() {
-  loadPrices();
-  loadNews();
-  loadEconomic();
-  loadWhales();
-}
+      document.querySelector("#hbarTable tbody").innerHTML = hbarData.map(t => `
+        <tr>
+          <td>${t.time}</td>
+          <td>${t.from}</td>
+          <td>${t.to}</td>
+          <td>${t.amount}</td>
+          <td>${t.type}</td>
+          <td class="${t.direction === '매수' ? 'buy' : 'sell'}">${t.direction}</td>
+        </tr>
+      `).join('');
+    }
 
-loadAll();
-setInterval(loadAll, 30000);
-</script>
+    function updateAll() {
+      loadPrices();
+      loadNews();
+      loadEconomic();
+      loadWhaleTrades();
+    }
 
+    updateAll();
+    setInterval(updateAll, 30000);
+  </script>
 </body>
 </html>

@@ -1,176 +1,183 @@
-from flask import Flask, render_template, jsonify
-from datetime import datetime
-import pytz
-import random
-import requests
-import os
-import feedparser
-
-app = Flask(__name__)
-
-MAX_POINTS = 60
-KST = pytz.timezone('Asia/Seoul')
-
-btc_data = []
-hbar_data = []
-btc_trades = []
-hbar_trades = []
-news_cache = []
-economic_data_cache = []
-
-exchange_addresses = {"binance_wallet", "upbit_wallet", "coinbase_wallet"}
-
-def get_kst_time():
-    return datetime.now(KST).strftime("%Y-%m-%d %H:%M:%S")
-
-def generate_mock_summary_data(coin="btc"):
-    if coin == "hbar":
-        ranges = {
-            "0-1K": {"count": random.randint(30, 60), "volume": 0.0},
-            "1K-10K": {"count": random.randint(10, 20), "volume": 0.0},
-            "10K-100K": {"count": random.randint(2, 8), "volume": 0.0},
-            "100K+": {"count": random.randint(0, 3), "volume": 0.0}
-        }
-    else:
-        ranges = {
-            "0-1": {"count": random.randint(50, 100), "volume": 0.0},
-            "1-10": {"count": random.randint(5, 15), "volume": 0.0},
-            "10-100": {"count": random.randint(1, 5), "volume": 0.0},
-            "100+": {"count": random.randint(0, 2), "volume": 0.0}
-        }
-
-    for k in ranges:
-        low, high = (1, 10) if "1-10" in k or "1K-10K" in k else (
-            10, 100) if "10-100" in k or "10K-100K" in k else (
-            100, 300) if "100+" in k or "100K+" in k else (0.01, 1)
-        ranges[k]["volume"] = round(ranges[k]["count"] * random.uniform(low, high), 2)
-    return ranges
-
-def generate_mock_trades(coin="btc"):
-    trades = []
-    now = get_kst_time()
-    for _ in range(random.randint(5, 10)):
-        amount = round(random.uniform(0.05, 300000), 2) if coin == "hbar" else round(random.uniform(0.05, 300), 2)
-        if coin == "hbar":
-            type_label = "0-1K" if amount < 1000 else "1K-10K" if amount < 10000 else "10K-100K" if amount < 100000 else "100K+"
-        else:
-            type_label = "0-1" if amount < 1 else "1-10" if amount < 10 else "10-100" if amount < 100 else "100+"
-
-        from_addr = random.choice(["user_wallet", "whale_wallet", "random_wallet", "binance_wallet"])
-        to_addr = random.choice(["upbit_wallet", "user_wallet", "coinbase_wallet"])
-        direction = "매도" if to_addr in exchange_addresses else "매수"
-
-        trades.append({
-            "time": now,
-            "from": from_addr,
-            "to": to_addr,
-            "amount": amount,
-            "type": type_label,
-            "direction": direction
-        })
-    return trades
-
-@app.route("/")
-def index():
-    return render_template("index.html")
-
-@app.route("/api/btc")
-def api_btc():
-    now = get_kst_time()
-    summary = generate_mock_summary_data("btc")
-    btc_data.append({"time": now, "data": summary})
-    if len(btc_data) > MAX_POINTS:
-        btc_data.pop(0)
-    return jsonify(btc_data)
-
-@app.route("/api/hbar")
-def api_hbar():
-    now = get_kst_time()
-    summary = generate_mock_summary_data("hbar")
-    hbar_data.append({"time": now, "data": summary})
-    if len(hbar_data) > MAX_POINTS:
-        hbar_data.pop(0)
-    return jsonify(hbar_data)
-
-@app.route("/api/btc_trades")
-def api_btc_trades():
-    trades = generate_mock_trades("btc")
-    btc_trades.extend(trades)
-    if len(btc_trades) > MAX_POINTS * 10:
-        del btc_trades[:len(btc_trades) - MAX_POINTS * 10]
-    return jsonify(btc_trades[-30:])
-
-@app.route("/api/hbar_trades")
-def api_hbar_trades():
-    trades = generate_mock_trades("hbar")
-    hbar_trades.extend(trades)
-    if len(hbar_trades) > MAX_POINTS * 10:
-        del hbar_trades[:len(hbar_trades) - MAX_POINTS * 10]
-    return jsonify(hbar_trades[-30:])
-
-@app.route("/api/price")
-def api_price():
-    url = "https://api.coingecko.com/api/v3/simple/price"
-    params = {
-        "ids": "bitcoin,hedera-hashgraph",
-        "vs_currencies": "usd",
-        "include_24hr_change": "true"
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <title>🐋 고래 모니터링 대시보드</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background-color: white;
+      color: black;
+      transition: background-color 0.3s, color 0.3s;
     }
-    res = requests.get(url, params=params)
-    data = res.json()
-    return jsonify({
-        "BTC": {
-            "price": round(data["bitcoin"]["usd"], 2),
-            "change": round(data["bitcoin"]["usd_24h_change"], 2)
-        },
-        "HBAR": {
-            "price": round(data["hedera-hashgraph"]["usd"], 4),
-            "change": round(data["hedera-hashgraph"]["usd_24h_change"], 2)
-        }
-    })
+    .dark-mode {
+      background-color: #1e1e1e;
+      color: white;
+    }
+    button { margin: 6px; padding: 8px 12px; font-weight: bold; }
+    .tab { display: none; }
+    .tab.active { display: block; }
+    table { border-collapse: collapse; width: 100%; margin-top: 10px; }
+    th, td { border: 1px solid #ccc; padding: 6px; text-align: center; font-size: 14px; }
+    th { background-color: #f0f0f0; }
+    .dark-mode th { background-color: #444; }
+    .buy { color: red; font-weight: bold; }
+    .sell { color: blue; font-weight: bold; }
+    .highlight { background-color: yellow; font-weight: bold; }
+    .sparkline { height: 40px; }
+  </style>
+</head>
+<body>
+  <h1>🐋 고래 모니터링 대시보드</h1>
 
-@app.route("/api/news")
-def api_news():
-    global news_cache
-    if news_cache:
-        return jsonify(news_cache)
-    feed_url = "https://cointelegraph.com/rss"
-    feed = feedparser.parse(feed_url)
-    entries = []
-    for entry in feed.entries[:10]:
-        entries.append({
-            "title": entry.title,
-            "link": entry.link,
-            "published": entry.published
-        })
-    news_cache = entries
-    return jsonify(entries)
+  <!-- 📌 탭 -->
+  <div>
+    <button onclick="showTab('price')">💰 시세</button>
+    <button onclick="showTab('news')">📰 뉴스</button>
+    <button onclick="showTab('econ')">📅 경제지표</button>
+    <button onclick="showTab('whales')">🐋 고래 거래</button>
+    <button onclick="toggleDarkMode()">🌙 다크모드</button>
+  </div>
 
-@app.route("/api/economics")
-def api_economics():
-    global economic_data_cache
-    if economic_data_cache:
-        return jsonify(economic_data_cache)
+  <!-- 💰 시세 -->
+  <div id="price" class="tab active">
+    <h2>💰 실시간 시세</h2>
+    <div id="priceCards"></div>
+  </div>
 
-    url = "https://api.tradingeconomics.com/calendar/country/south%20korea"
-    params = {"c": "5fba47f95dec4cc:zg06c8m5ojpqocb"}
-    res = requests.get(url, params=params)
-    data = res.json()
+  <!-- 📰 뉴스 -->
+  <div id="news" class="tab">
+    <h2>📰 Cointelegraph 뉴스</h2>
+    <div id="newsList"></div>
+  </div>
 
-    important = []
-    for item in data:
-        if item.get("importance", 0) == 3:
-            impact = "▲ 코인에 긍정적" if "GDP" in item["event"] or "Employment" in item["event"] else "▼ 코인 시장에 부정적"
-            important.append({
-                "date": item["date"],
-                "event": item["event"],
-                "country": item["country"],
-                "impact": impact
-            })
+  <!-- 📅 경제지표 -->
+  <div id="econ" class="tab">
+    <h2>📅 주요 경제지표</h2>
+    <table>
+      <thead>
+        <tr><th>날짜</th><th>지표명</th><th>국가</th><th>해석</th></tr>
+      </thead>
+      <tbody id="econBody"></tbody>
+    </table>
+  </div>
 
-    economic_data_cache = important[:10]
-    return jsonify(economic_data_cache)
+  <!-- 🐋 고래 거래 -->
+  <div id="whales" class="tab">
+    <h2>🐳 BTC 고래 거래</h2>
+    <table>
+      <thead>
+        <tr><th>시간</th><th>From</th><th>To</th><th>수량</th><th>구간</th><th>방향</th></tr>
+      </thead>
+      <tbody id="btcTable"></tbody>
+    </table>
 
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 10000))
-    app.run(host="0.0.0.0", port=port)
+    <h2>🧊 HBAR 고래 거래</h2>
+    <table>
+      <thead>
+        <tr><th>시간</th><th>From</th><th>To</th><th>수량</th><th>구간</th><th>방향</th></tr>
+      </thead>
+      <tbody id="hbarTable"></tbody>
+    </table>
+  </div>
+
+  <script>
+    function showTab(id) {
+      document.querySelectorAll(".tab").forEach(el => el.classList.remove("active"));
+      document.getElementById(id).classList.add("active");
+    }
+
+    function toggleDarkMode() {
+      document.body.classList.toggle("dark-mode");
+    }
+
+    async function loadPrices() {
+      try {
+        const res = await fetch('/api/price');
+        const data = await res.json();
+        const el = document.getElementById("priceCards");
+        el.innerHTML = Object.keys(data).map(key => `
+          <div>
+            <h3>${key}</h3>
+            <p>💲 ${data[key].price.toLocaleString()} USD</p>
+            <p>📉 변화율: ${data[key].change}%</p>
+          </div>
+        `).join('');
+      } catch (e) {
+        console.error("가격 로딩 실패", e);
+      }
+    }
+
+    async function loadNews() {
+      const res = await fetch("/api/news");
+      const news = await res.json();
+      const el = document.getElementById("newsList");
+      el.innerHTML = news.map(n => `
+        <div style="margin-bottom:10px;">
+          <a href="${n.link}" target="_blank"><strong>${n.title}</strong></a><br/>
+          발행일: ${n.date}<br/>
+          <em>${n.summary}</em>
+        </div>
+      `).join('');
+    }
+
+    async function loadEconomics() {
+      const res = await fetch("/api/economics");
+      const econ = await res.json();
+      const el = document.getElementById("econBody");
+      el.innerHTML = econ.map(e => `
+        <tr>
+          <td>${e.date}</td>
+          <td>${e.event}</td>
+          <td>${e.country}</td>
+          <td>${e.effect}</td>
+        </tr>
+      `).join('');
+    }
+
+    async function loadWhales() {
+      const btcRes = await fetch("/api/btc_trades");
+      const hbarRes = await fetch("/api/hbar_trades");
+      const btc = await btcRes.json();
+      const hbar = await hbarRes.json();
+
+      document.getElementById("btcTable").innerHTML = btc.map(d => `
+        <tr>
+          <td>${d.time}</td>
+          <td class="${isExchange(d.from) ? 'highlight' : ''}">${d.from}</td>
+          <td class="${isExchange(d.to) ? 'highlight' : ''}">${d.to}</td>
+          <td>${d.amount}</td>
+          <td>${d.type}</td>
+          <td class="${d.direction === '매수' ? 'buy' : 'sell'}">${d.direction}</td>
+        </tr>
+      `).join('');
+
+      document.getElementById("hbarTable").innerHTML = hbar.map(d => `
+        <tr>
+          <td>${d.time}</td>
+          <td class="${isExchange(d.from) ? 'highlight' : ''}">${d.from}</td>
+          <td class="${isExchange(d.to) ? 'highlight' : ''}">${d.to}</td>
+          <td>${d.amount}</td>
+          <td>${d.type}</td>
+          <td class="${d.direction === '매수' ? 'buy' : 'sell'}">${d.direction}</td>
+        </tr>
+      `).join('');
+    }
+
+    function isExchange(addr) {
+      return ['binance_wallet', 'upbit_wallet', 'coinbase_wallet'].includes(addr);
+    }
+
+    async function loadAll() {
+      await loadPrices();
+      await loadNews();
+      await loadEconomics();
+      await loadWhales();
+    }
+
+    loadAll();
+    setInterval(loadAll, 30000);
+  </script>
+</body>
+</html>

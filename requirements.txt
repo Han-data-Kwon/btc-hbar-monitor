@@ -1,3 +1,4 @@
-flask
-requests
+Flask
 pytz
+requests
+feedparser

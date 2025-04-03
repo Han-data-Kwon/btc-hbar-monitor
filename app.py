@@ -14,28 +14,28 @@ app = Flask(__name__)
 @app.route("/api/price")
 def api_price():
     try:
-        url = "https://api.coingecko.com/api/v3/simple/price"
-        params = {
-            "ids": "bitcoin,ethereum,hedera-hashgraph,ripple",
-            "vs_currencies": "usd",
-            "include_24hr_change": "true"
-        }
-        res = requests.get(url, params=params).json()
-        print("시세 응답 구조:", res)
-
-        def safe_get(data, key):
-            return round(data.get(key, {}).get("usd", 0), 2), round(data.get(key, {}).get("usd_24h_change", 0), 2)
-
-        btc_price, btc_change = safe_get(res, "bitcoin")
-        eth_price, eth_change = safe_get(res, "ethereum")
-        hbar_price, hbar_change = safe_get(res, "hedera-hashgraph")
-        xrp_price, xrp_change = safe_get(res, "ripple")
-
+        res = requests.get(
+            "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,hedera-hashgraph,ripple"
+            "&vs_currencies=usd&include_24hr_change=true").json()
+        print("==== 코인 시세 응답 ====")
+        print(res)
         return jsonify({
-            "BTC": {"price": btc_price, "change": btc_change},
-            "ETH": {"price": eth_price, "change": eth_change},
-            "HBAR": {"price": hbar_price, "change": hbar_change},
-            "XRP": {"price": xrp_price, "change": xrp_change},
+            "BTC": {
+                "price": round(res.get("bitcoin", {}).get("usd", 0), 2),
+                "change": round(res.get("bitcoin", {}).get("usd_24h_change", 0), 2),
+            },
+            "ETH": {
+                "price": round(res.get("ethereum", {}).get("usd", 0), 2),
+                "change": round(res.get("ethereum", {}).get("usd_24h_change", 0), 2),
+            },
+            "HBAR": {
+                "price": round(res.get("hedera-hashgraph", {}).get("usd", 0), 2),
+                "change": round(res.get("hedera-hashgraph", {}).get("usd_24h_change", 0), 2),
+            },
+            "XRP": {
+                "price": round(res.get("ripple", {}).get("usd", 0), 2),
+                "change": round(res.get("ripple", {}).get("usd_24h_change", 0), 2),
+            },
         })
     except Exception as e:
         print("시세 API 오류:", e)
@@ -63,12 +63,9 @@ def api_news():
 def api_economics():
     try:
         key = os.environ.get("TRADING_API_KEY", "")
-        if not key:
-            raise ValueError("TRADING_API_KEY 환경변수가 없습니다")
-
         res = requests.get(f"https://api.tradingeconomics.com/calendar?c={key}").json()
-        if not isinstance(res, list):
-            raise ValueError("API 응답이 리스트가 아닙니다")
+        print("==== 경제지표 응답 ====")
+        print(res[:2])
 
         filtered = [
             {
@@ -80,17 +77,15 @@ def api_economics():
                 "previous": d.get("previous"),
                 "importance": d.get("importance"),
             }
-            for d in res if d.get("importance") == "High"
+            for d in res if d.get("importance") in ["High", "Medium"]
         ]
-
         sorted_data = sorted(filtered, key=lambda x: x["date"], reverse=True)
-
         result = [
             {
                 "date": d["date"],
                 "event": d["event"],
                 "country": d["country"],
-                "effect": "시장 영향 높음",
+                "effect": "시장 영향 높음" if d["importance"] == "High" else "시장 영향 보통",
                 "actual": d["actual"],
                 "forecast": d["forecast"],
                 "previous": d["previous"]
@@ -135,14 +130,12 @@ def classify_trade_type(amount, coin):
 
 @app.route("/api/btc_trades")
 def api_btc_trades():
-    trades = generate_mock_trades("btc")
-    return jsonify(trades)
+    return jsonify(generate_mock_trades("btc"))
 
 
 @app.route("/api/hbar_trades")
 def api_hbar_trades():
-    trades = generate_mock_trades("hbar")
-    return jsonify(trades)
+    return jsonify(generate_mock_trades("hbar"))
 
 
 @app.route("/")

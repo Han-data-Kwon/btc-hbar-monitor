@@ -1,8 +1,9 @@
 from flask import Flask, render_template, jsonify
-import requests
 from datetime import datetime
 import pytz
 import random
+import requests
+import os  # ✅ 이 줄이 꼭 필요
 
 app = Flask(__name__)
 

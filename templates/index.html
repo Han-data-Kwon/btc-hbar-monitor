@@ -1,213 +1,262 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-    <meta charset="UTF-8">
-    <title>고래 모니터링 대시보드</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <style>
-        body { font-family: 'Arial', sans-serif; padding: 20px; }
-        .tabs button { margin-right: 10px; padding: 10px; border: 1px solid #ccc; border-radius: 6px; cursor: pointer; }
-        .tabcontent { display: none; margin-top: 20px; }
-        .active { border: 2px solid black; font-weight: bold; }
-        .price-card {
-            border: 1px solid #ccc; border-radius: 10px; padding: 15px; width: 220px;
-            display: inline-block; margin: 10px; vertical-align: top;
-        }
-        .coin-img { max-width: 100px; max-height: 60px; margin-bottom: 5px; }
-        .news-img { max-width: 100%; max-height: 180px; }
-        .dark-mode { background-color: #222; color: #f0f0f0; }
-    </style>
+  <meta charset="UTF-8" />
+  <title>고래 모니터링 대시보드</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels"></script>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background-color: white;
+      color: black;
+      transition: background-color 0.3s, color 0.3s;
+    }
+    .dark-mode {
+      background-color: #1e1e1e;
+      color: white;
+    }
+    button {
+      margin: 6px;
+      padding: 8px 12px;
+      font-weight: bold;
+    }
+    .tab { display: none; }
+    .tab.active { display: block; }
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      margin-top: 10px;
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 6px;
+      text-align: center;
+      font-size: 14px;
+    }
+    th { background-color: #f0f0f0; }
+    .dark-mode th { background-color: #444; }
+    .buy { color: red; font-weight: bold; }
+    .sell { color: blue; font-weight: bold; }
+    .highlight { background-color: yellow; font-weight: bold; }
+    .news-image {
+      width: 100px;
+      height: auto;
+      max-height: 80px;
+      object-fit: cover;
+    }
+    .news-card {
+      display: flex;
+      align-items: center;
+      margin-bottom: 10px;
+      gap: 10px;
+    }
+    .highlight-hbar {
+      background-color: #ffd1dc;
+      font-weight: bold;
+    }
+  </style>
 </head>
 <body>
+  <h1>🐋 고래 모니터링 대시보드</h1>
 
-    <h1>🐳 고래 모니터링 대시보드</h1>
+  <div>
+    <button onclick="showTab('price')">💰 시세</button>
+    <button onclick="showTab('news')">📰 뉴스</button>
+    <button onclick="showTab('econ')">📅 경제지표</button>
+    <button onclick="showTab('whales')">🐳 고래 거래</button>
+    <button style="float:right;" onclick="toggleDarkMode()">🌙 다크모드</button>
+  </div>
 
-    <div class="tabs">
-        <button onclick="openTab('price')" id="defaultTab">💰 시세</button>
-        <button onclick="openTab('news')">📰 뉴스</button>
-        <button onclick="openTab('economic')">📊 경제지표</button>
-        <button onclick="openTab('whales')">🐋 고래 거래</button>
-        <button style="float:right;" onclick="toggleDarkMode()">🌙 다크모드</button>
-    </div>
+  <div id="price" class="tab active">
+    <h2>💰 실시간 시세 및 RSI</h2>
+    <div id="priceCards"></div>
+    <canvas id="rsiChart" width="600" height="300"></canvas>
+  </div>
 
-    <!-- 시세 탭 -->
-    <div id="price" class="tabcontent">
-        <h2>💰 실시간 시세 & <strong>RSI</strong></h2>
-        <div id="priceCards"></div>
-        <canvas id="rsiChart" height="100"></canvas>
-    </div>
+  <div id="news" class="tab">
+    <h2>📰 Cointelegraph 뉴스</h2>
+    <div id="newsList"></div>
+  </div>
 
-    <!-- 뉴스 탭 -->
-    <div id="news" class="tabcontent">
-        <h2>📰 코인 뉴스 요약</h2>
-        <div id="newsContainer"></div>
-    </div>
+  <div id="econ" class="tab">
+    <h2>📅 주요 경제지표</h2>
+    <div id="econEmpty" style="color: gray;"></div>
+    <table>
+      <thead>
+        <tr><th>날짜</th><th>지표명</th><th>국가</th><th>실제</th><th>예측</th><th>이전</th><th>해석</th></tr>
+      </thead>
+      <tbody id="econBody"></tbody>
+    </table>
+  </div>
 
-    <!-- 경제지표 탭 -->
-    <div id="economic" class="tabcontent">
-        <h2>📊 주요 경제지표</h2>
-        <div id="economicsContainer"></div>
-    </div>
+  <div id="whales" class="tab">
+    <h2>🐳 BTC 고래 거래</h2>
+    <table>
+      <thead>
+        <tr><th>시간(KST)</th><th>From</th><th>To</th><th>수량</th><th>구간</th><th>방향</th></tr>
+      </thead>
+      <tbody id="btcTable"></tbody>
+    </table>
 
-    <!-- 고래 거래 탭 -->
-    <div id="whales" class="tabcontent">
-        <h2>🐋 고래 거래</h2>
-        <div id="whaleContainer">
-            <h3>BTC 거래</h3>
-            <table border="1" id="btcTable"></table>
-            <h3>HBAR 거래</h3>
-            <table border="1" id="hbarTable"></table>
+    <h2>🧊 HBAR 고래 거래</h2>
+    <table>
+      <thead>
+        <tr><th>시간(KST)</th><th>From</th><th>To</th><th>수량</th><th>구간</th><th>방향</th></tr>
+      </thead>
+      <tbody id="hbarTable"></tbody>
+    </table>
+  </div>
+
+  <script>
+    function showTab(id) {
+      document.querySelectorAll(".tab").forEach(el => el.classList.remove("active"));
+      document.getElementById(id).classList.add("active");
+    }
+
+    function toggleDarkMode() {
+      document.body.classList.toggle("dark-mode");
+    }
+
+    async function loadPrices() {
+      try {
+        const res = await fetch('/api/price');
+        const data = await res.json();
+        const el = document.getElementById("priceCards");
+        el.innerHTML = Object.keys(data).map(key => `
+          <div>
+            <h3>${key}</h3>
+            <p>💲 ${data[key].price?.toLocaleString() || 'N/A'} USD</p>
+            <p>📉 변화율: ${data[key].change || 0}%</p>
+          </div>
+        `).join('');
+      } catch (e) {
+        console.error("시세 로딩 실패", e);
+      }
+    }
+
+    async function loadRSI() {
+      const ctx = document.getElementById('rsiChart').getContext('2d');
+      const res = await fetch('/api/rsi');
+      const data = await res.json();
+      new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: data.map(d => d.time),
+          datasets: [{
+            label: 'BTC RSI',
+            data: data.map(d => d.rsi),
+            borderWidth: 2,
+            fill: false,
+            tension: 0.3
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: {
+            datalabels: {
+              display: true,
+              align: 'top',
+              color: 'blue',
+              formatter: v => v
+            }
+          },
+          scales: {
+            x: { title: { display: true, text: '시간(KST)' } },
+            y: { title: { display: true, text: 'RSI' }, min: 0, max: 100 }
+          }
+        },
+        plugins: [ChartDataLabels]
+      });
+    }
+
+    async function loadNews() {
+      const res = await fetch("/api/news");
+      const news = await res.json();
+      const el = document.getElementById("newsList");
+      el.innerHTML = news.map(n => `
+        <div class="news-card ${n.title.includes("HBAR") || n.summary.includes("HBAR") ? 'highlight-hbar' : ''}">
+          <img class="news-image" src="${n.image}" onerror="this.style.display='none'" />
+          <div>
+            <a href="${n.link}" target="_blank"><strong>${n.title}</strong></a><br/>
+            발행일: ${n.date}<br/>
+            <em>${n.summary}</em>
+          </div>
         </div>
-    </div>
+      `).join('');
+    }
 
-    <script>
-        function openTab(tabName) {
-            $('.tabcontent').hide();
-            $('#' + tabName).show();
-            $('.tabs button').removeClass("active");
-            $(`.tabs button:contains(${tabName === 'price' ? '시세' : tabName === 'news' ? '뉴스' : tabName === 'economic' ? '경제지표' : '고래'})`).addClass("active");
-        }
+    async function loadEconomics() {
+      const res = await fetch("/api/economics");
+      const econ = await res.json();
+      const el = document.getElementById("econBody");
+      const empty = document.getElementById("econEmpty");
 
-        function toggleDarkMode() {
-            document.body.classList.toggle("dark-mode");
-        }
+      if (econ.length === 0) {
+        empty.innerText = "현재 표시할 경제지표가 없습니다.";
+        el.innerHTML = "";
+        return;
+      }
 
-        async function fetchPrice() {
-            const res = await fetch("/api/price");
-            const data = await res.json();
-            const container = $("#priceCards").empty();
-            for (const [coin, v] of Object.entries(data)) {
-                const trendIcon = v.change > 0 ? "📈" : "📉";
-                container.append(`
-                    <div class="price-card">
-                        <h3>${coin}</h3>
-                        <p style="color:green;">💲 ${v.price} USD</p>
-                        <p>${trendIcon} 변화율: ${v.change}%</p>
-                    </div>
-                `);
-            }
-        }
+      empty.innerText = "";
+      el.innerHTML = econ.map(e => `
+        <tr>
+          <td>${e.date}</td>
+          <td>${e.event}</td>
+          <td>${e.country}</td>
+          <td>${e.actual ?? '-'}</td>
+          <td>${e.forecast ?? '-'}</td>
+          <td>${e.previous ?? '-'}</td>
+          <td>${e.effect}</td>
+        </tr>
+      `).join('');
+    }
 
-        async function fetchRSIChart() {
-            const res = await fetch("/api/rsi");
-            const data = await res.json();
-            const labels = ["1", "2", "3", "4", "5"];
-            const ctx = document.getElementById("rsiChart").getContext("2d");
+    function isExchange(addr) {
+      return ['binance_wallet', 'upbit_wallet', 'coinbase_wallet'].includes(addr);
+    }
 
-            new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: labels,
-                    datasets: Object.entries(data).map(([coin, values]) => ({
-                        label: coin,
-                        data: values,
-                        fill: false,
-                        tension: 0.3,
-                        borderWidth: 2,
-                    }))
-                },
-                options: {
-                    responsive: true,
-                    plugins: {
-                        datalabels: {
-                            color: 'black',
-                            anchor: 'end',
-                            align: 'top',
-                            formatter: v => v,
-                            font: { weight: 'bold' }
-                        }
-                    }
-                },
-                plugins: [ChartDataLabels]
-            });
-        }
+    async function loadWhales() {
+      const [btcRes, hbarRes] = await Promise.all([
+        fetch("/api/btc_trades"),
+        fetch("/api/hbar_trades")
+      ]);
+      const btc = await btcRes.json();
+      const hbar = await hbarRes.json();
 
-        async function fetchNews() {
-            const res = await fetch("/api/news");
-            const data = await res.json();
-            const container = $("#newsContainer").empty();
-            data.forEach(article => {
-                container.append(`
-                    <div style="margin-bottom:20px;">
-                        ${article.image ? `<img src="${article.image}" class="news-img">` : ""}
-                        <h4><a href="${article.link}" target="_blank">${article.title}</a></h4>
-                        <p>${article.date}</p>
-                        <p>${article.summary}</p>
-                    </div>
-                `);
-            });
-        }
+      document.getElementById("btcTable").innerHTML = btc.map(d => `
+        <tr>
+          <td>${d.time}</td>
+          <td class="${isExchange(d.from) ? 'highlight' : ''}">${d.from}</td>
+          <td class="${isExchange(d.to) ? 'highlight' : ''}">${d.to}</td>
+          <td>${d.amount}</td>
+          <td>${d.type}</td>
+          <td class="${d.direction === '매수' ? 'buy' : 'sell'}">${d.direction}</td>
+        </tr>
+      `).join('');
 
-        async function fetchEconomics() {
-            const res = await fetch("/api/economics");
-            const data = await res.json();
-            const container = $("#economicsContainer").empty();
-            if (data.message) {
-                container.append(`<p>${data.message}</p>`);
-            } else {
-                let table = "<table border='1'><tr><th>날짜</th><th>지표명</th><th>국가</th><th>이전</th><th>예측</th><th>실제</th><th>해석</th></tr>";
-                data.forEach(d => {
-                    table += `<tr>
-                        <td>${d.date}</td>
-                        <td>${d.event}</td>
-                        <td>${d.country}</td>
-                        <td>${d.previous}</td>
-                        <td>${d.forecast}</td>
-                        <td>${d.actual}</td>
-                        <td>${d.effect}</td>
-                    </tr>`;
-                });
-                table += "</table>";
-                container.append(table);
-            }
-        }
+      document.getElementById("hbarTable").innerHTML = hbar.map(d => `
+        <tr>
+          <td>${d.time}</td>
+          <td class="${isExchange(d.from) ? 'highlight' : ''}">${d.from}</td>
+          <td class="${isExchange(d.to) ? 'highlight' : ''}">${d.to}</td>
+          <td>${d.amount}</td>
+          <td>${d.type}</td>
+          <td class="${d.direction === '매수' ? 'buy' : 'sell'}">${d.direction}</td>
+        </tr>
+      `).join('');
+    }
 
-        async function fetchWhales() {
-            const btc = await fetch("/api/btc_trades").then(r => r.json());
-            const hbar = await fetch("/api/hbar_trades").then(r => r.json());
+    async function loadAll() {
+      await loadPrices();
+      await loadRSI();
+      await loadNews();
+      await loadEconomics();
+      await loadWhales();
+    }
 
-            const renderTable = (data) => {
-                let html = `<tr><th>시간</th><th>보낸 주소</th><th>받는 주소</th><th>수량</th><th>유형</th><th>방향</th></tr>`;
-                data.forEach(d => {
-                    const dirColor = d.direction === "매수" ? "red" : "blue";
-                    html += `<tr>
-                        <td>${d.time}</td>
-                        <td>${d.from}</td>
-                        <td>${d.to}</td>
-                        <td>${d.amount}</td>
-                        <td>${d.type}</td>
-                        <td style="color:${dirColor}; font-weight:bold;">${d.direction}</td>
-                    </tr>`;
-                });
-                return html;
-            };
-
-            $("#btcTable").html(renderTable(btc));
-            $("#hbarTable").html(renderTable(hbar));
-        }
-
-        function refresh() {
-            fetchPrice();
-            fetchRSIChart();
-            fetchWhales();
-        }
-
-        document.addEventListener("DOMContentLoaded", function () {
-            document.getElementById("defaultTab").click();
-            fetchPrice();
-            fetchRSIChart();
-            fetchNews();
-            fetchEconomics();
-            fetchWhales();
-            setInterval(() => {
-                if ($("#price").is(":visible") || $("#whales").is(":visible")) {
-                    refresh();
-                }
-            }, 30000); // 30초 간격
-        });
-    </script>
-
+    loadAll();
+    setInterval(loadAll, 30000);
+  </script>
 </body>
 </html>

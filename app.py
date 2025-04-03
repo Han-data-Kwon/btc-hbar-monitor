@@ -1,74 +1,59 @@
+# 전체 수정된 app.py 코드
+
 import os
 import random
 import requests
 from flask import Flask, render_template, jsonify
-from datetime import datetime
+from datetime import datetime, timedelta
 from dotenv import load_dotenv
 import feedparser
 
 load_dotenv()
+
 app = Flask(__name__)
 
 # --- 시세 API ---
 @app.route("/api/price")
 def api_price():
     try:
-        url = "https://api.coingecko.com/api/v3/simple/price"
-        params = {
-            "ids": "bitcoin,ethereum,hedera-hashgraph,ripple",
-            "vs_currencies": "usd",
-            "include_24hr_change": "true"
-        }
-        res = requests.get(url, params=params).json()
+        res = requests.get("https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,hedera-hashgraph,ripple&vs_currencies=usd&include_24hr_change=true").json()
         return jsonify({
             "BTC": {
-                "price": round(res.get("bitcoin", {}).get("usd", 0), 2),
-                "change": round(res.get("bitcoin", {}).get("usd_24h_change", 0), 2),
+                "price": round(res["bitcoin"]["usd"], 2),
+                "change": round(res["bitcoin"]["usd_24h_change"], 2),
             },
             "ETH": {
-                "price": round(res.get("ethereum", {}).get("usd", 0), 2),
-                "change": round(res.get("ethereum", {}).get("usd_24h_change", 0), 2),
+                "price": round(res["ethereum"]["usd"], 2),
+                "change": round(res["ethereum"]["usd_24h_change"], 2),
             },
             "HBAR": {
-                "price": round(res.get("hedera-hashgraph", {}).get("usd", 0), 2),
-                "change": round(res.get("hedera-hashgraph", {}).get("usd_24h_change", 0), 2),
+                "price": round(res["hedera-hashgraph"]["usd"], 4),
+                "change": round(res["hedera-hashgraph"]["usd_24h_change"], 2),
             },
             "XRP": {
-                "price": round(res.get("ripple", {}).get("usd", 0), 2),
-                "change": round(res.get("ripple", {}).get("usd_24h_change", 0), 2),
+                "price": round(res["ripple"]["usd"], 2),
+                "change": round(res["ripple"]["usd_24h_change"], 2),
             },
         })
     except Exception as e:
         print("시세 API 오류:", e)
-        return jsonify({
-            "BTC": {"price": 0, "change": 0},
-            "ETH": {"price": 0, "change": 0},
-            "HBAR": {"price": 0, "change": 0},
-            "XRP": {"price": 0, "change": 0},
-        })
-
-# --- RSI Mock ---
-@app.route("/api/rsi")
-def api_rsi():
-    return jsonify({
-        "BTC": [35, 32, 33, 37, 31],
-        "ETH": [48, 52, 47, 47, 43],
-        "HBAR": [41, 46, 42, 50, 51],
-        "XRP": [28, 31, 40, 42, 39]
-    })
+        return jsonify({})
 
 # --- 뉴스 API ---
 @app.route("/api/news")
 def api_news():
     feed = feedparser.parse("https://cointelegraph.com/rss")
     articles = []
-    for entry in feed.entries[:5]:
+    for entry in feed.entries[:10]:
+        title = entry.title
+        is_hbar = "hedera" in title.lower() or "hbar" in title.lower()
         articles.append({
-            "title": entry.title,
+            "title": title,
             "link": entry.link,
             "date": entry.published,
             "summary": entry.summary,
-            "image": entry.get("media_content", [{}])[0].get("url", "") if entry.get("media_content") else ""
+            "image": entry.get("media_content", [{}])[0].get("url", "") if entry.get("media_content") else "",
+            "highlight": is_hbar
         })
     return jsonify(articles)
 
@@ -77,8 +62,8 @@ def api_news():
 def api_economics():
     try:
         key = os.environ.get("TRADING_API_KEY", "")
-        url = f"https://api.tradingeconomics.com/calendar?c={key}"
-        res = requests.get(url).json()
+        res = requests.get(f"https://api.tradingeconomics.com/calendar?c={key}").json()
+        yesterday = (datetime.utcnow() - timedelta(days=1)).date().isoformat()
         filtered = [
             {
                 "date": d.get("date", "")[:10],
@@ -87,29 +72,27 @@ def api_economics():
                 "actual": d.get("actual"),
                 "forecast": d.get("forecast"),
                 "previous": d.get("previous"),
-                "importance": d.get("importance"),
+                "importance": d.get("importance", ""),
             }
-            for d in res if d.get("importance") == "High"
+            for d in res if d.get("date", "").startswith(yesterday)
         ]
-        if not filtered:
-            return jsonify({"message": "중요 경제지표 없음"})
         sorted_data = sorted(filtered, key=lambda x: x["date"], reverse=True)
         result = [
             {
                 "date": d["date"],
                 "event": d["event"],
                 "country": d["country"],
-                "effect": "시장 영향 높음",
+                "effect": "시장 영향 높음" if d["importance"] == "High" else "보통 또는 낮음",
                 "actual": d["actual"],
                 "forecast": d["forecast"],
                 "previous": d["previous"]
             }
-            for d in sorted_data[:15]
+            for d in sorted_data
         ]
         return jsonify(result)
     except Exception as e:
         print("경제지표 API 오류:", e)
-        return jsonify({"message": "API 오류로 데이터를 불러올 수 없음"})
+        return jsonify([])
 
 # --- 고래 거래 MOCK ---
 def generate_mock_trades(coin):
@@ -141,11 +124,13 @@ def classify_trade_type(amount, coin):
 
 @app.route("/api/btc_trades")
 def api_btc_trades():
-    return jsonify(generate_mock_trades("btc"))
+    trades = generate_mock_trades("btc")
+    return jsonify(trades)
 
 @app.route("/api/hbar_trades")
 def api_hbar_trades():
-    return jsonify(generate_mock_trades("hbar"))
+    trades = generate_mock_trades("hbar")
+    return jsonify(trades)
 
 @app.route("/")
 def index():

@@ -3,8 +3,8 @@ from datetime import datetime
 import pytz
 import random
 import requests
-import feedparser
 import os
+import feedparser
 
 app = Flask(__name__)
 
@@ -15,6 +15,8 @@ btc_data = []
 hbar_data = []
 btc_trades = []
 hbar_trades = []
+news_cache = []
+economic_data_cache = []
 
 exchange_addresses = {"binance_wallet", "upbit_wallet", "coinbase_wallet"}
 
@@ -49,25 +51,10 @@ def generate_mock_trades(coin="btc"):
     now = get_kst_time()
     for _ in range(random.randint(5, 10)):
         amount = round(random.uniform(0.05, 300000), 2) if coin == "hbar" else round(random.uniform(0.05, 300), 2)
-
         if coin == "hbar":
-            if amount < 1000:
-                type_label = "0-1K"
-            elif amount < 10000:
-                type_label = "1K-10K"
-            elif amount < 100000:
-                type_label = "10K-100K"
-            else:
-                type_label = "100K+"
+            type_label = "0-1K" if amount < 1000 else "1K-10K" if amount < 10000 else "10K-100K" if amount < 100000 else "100K+"
         else:
-            if amount < 1:
-                type_label = "0-1"
-            elif amount < 10:
-                type_label = "1-10"
-            elif amount < 100:
-                type_label = "10-100"
-            else:
-                type_label = "100+"
+            type_label = "0-1" if amount < 1 else "1-10" if amount < 10 else "10-100" if amount < 100 else "100+"
 
         from_addr = random.choice(["user_wallet", "whale_wallet", "random_wallet", "binance_wallet"])
         to_addr = random.choice(["upbit_wallet", "user_wallet", "coinbase_wallet"])
@@ -125,7 +112,7 @@ def api_hbar_trades():
 def api_price():
     url = "https://api.coingecko.com/api/v3/simple/price"
     params = {
-        "ids": "bitcoin,hedera-hashgraph,ethereum,ripple",
+        "ids": "bitcoin,hedera-hashgraph",
         "vs_currencies": "usd",
         "include_24hr_change": "true"
     }
@@ -139,36 +126,51 @@ def api_price():
         "HBAR": {
             "price": round(data["hedera-hashgraph"]["usd"], 4),
             "change": round(data["hedera-hashgraph"]["usd_24h_change"], 2)
-        },
-        "ETH": {
-            "price": round(data["ethereum"]["usd"], 2),
-            "change": round(data["ethereum"]["usd_24h_change"], 2)
-        },
-        "XRP": {
-            "price": round(data["ripple"]["usd"], 2),
-            "change": round(data["ripple"]["usd_24h_change"], 2)
         }
     })
 
 @app.route("/api/news")
 def api_news():
-    url = "https://cointelegraph.com/rss"
-    feed = feedparser.parse(url)
-    items = feed.entries[:5]
-    result = []
-    for item in items:
-        result.append({
-            "title": item.title,
-            "link": item.link,
-            "published": item.published,
-            "summary": item.summary[:150] + "..."
+    global news_cache
+    if news_cache:
+        return jsonify(news_cache)
+    feed_url = "https://cointelegraph.com/rss"
+    feed = feedparser.parse(feed_url)
+    entries = []
+    for entry in feed.entries[:10]:
+        entries.append({
+            "title": entry.title,
+            "link": entry.link,
+            "published": entry.published
         })
-    return jsonify(result)
+    news_cache = entries
+    return jsonify(entries)
 
-@app.route("/api/economic")
-def api_economic():
-    return jsonify([
-        {"event": "미국 FOMC 금리 결정", "date": "2025-04-11", "impact": "매우 높음", "interpret": "금리가 예상보다 높으면 코인 하락 가능"},
-        {"event": "미국 고용 지표 발표", "date": "2025-04-05", "impact": "매우 높음", "interpret": "실업률 상승 시 위험자산에 악영향"},
-        {"event": "CPI 소비자물가지수", "date": "2025-04-08", "impact": "매우 높음", "interpret": "인플레이션 지표 상승 시 긴축 가능성 높아짐"}
-    ])
+@app.route("/api/economics")
+def api_economics():
+    global economic_data_cache
+    if economic_data_cache:
+        return jsonify(economic_data_cache)
+
+    url = "https://api.tradingeconomics.com/calendar/country/south%20korea"
+    params = {"c": "5fba47f95dec4cc:zg06c8m5ojpqocb"}
+    res = requests.get(url, params=params)
+    data = res.json()
+
+    important = []
+    for item in data:
+        if item.get("importance", 0) == 3:
+            impact = "▲ 코인에 긍정적" if "GDP" in item["event"] or "Employment" in item["event"] else "▼ 코인 시장에 부정적"
+            important.append({
+                "date": item["date"],
+                "event": item["event"],
+                "country": item["country"],
+                "impact": impact
+            })
+
+    economic_data_cache = important[:10]
+    return jsonify(economic_data_cache)
+
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host="0.0.0.0", port=port)

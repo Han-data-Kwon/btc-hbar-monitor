@@ -1,4 +1,4 @@
-Flask
-pytz
+flask
 requests
+pytz
 feedparser

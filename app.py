@@ -9,30 +9,34 @@ import feedparser
 load_dotenv()
 app = Flask(__name__)
 
-# 주요 코인 시세
+# --- 시세 API ---
 @app.route("/api/price")
 def api_price():
     try:
-        res = requests.get(
-            "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,hedera-hashgraph,ripple&vs_currencies=usd&include_24hr_change=true"
-        ).json()
+        url = "https://api.coingecko.com/api/v3/simple/price"
+        params = {
+            "ids": "bitcoin,ethereum,hedera-hashgraph,ripple",
+            "vs_currencies": "usd",
+            "include_24hr_change": "true"
+        }
+        res = requests.get(url, params=params).json()
         return jsonify({
             "BTC": {
-                "price": round(res.get("bitcoin", {}).get("usd", 0)),
+                "price": round(res.get("bitcoin", {}).get("usd", 0), 2),
                 "change": round(res.get("bitcoin", {}).get("usd_24h_change", 0), 2),
             },
             "ETH": {
-                "price": round(res.get("ethereum", {}).get("usd", 0)),
+                "price": round(res.get("ethereum", {}).get("usd", 0), 2),
                 "change": round(res.get("ethereum", {}).get("usd_24h_change", 0), 2),
             },
             "HBAR": {
-                "price": round(res.get("hedera-hashgraph", {}).get("usd", 0)),
+                "price": round(res.get("hedera-hashgraph", {}).get("usd", 0), 2),
                 "change": round(res.get("hedera-hashgraph", {}).get("usd_24h_change", 0), 2),
             },
             "XRP": {
-                "price": round(res.get("ripple", {}).get("usd", 0)),
+                "price": round(res.get("ripple", {}).get("usd", 0), 2),
                 "change": round(res.get("ripple", {}).get("usd_24h_change", 0), 2),
-            }
+            },
         })
     except Exception as e:
         print("시세 API 오류:", e)
@@ -40,10 +44,20 @@ def api_price():
             "BTC": {"price": 0, "change": 0},
             "ETH": {"price": 0, "change": 0},
             "HBAR": {"price": 0, "change": 0},
-            "XRP": {"price": 0, "change": 0}
+            "XRP": {"price": 0, "change": 0},
         })
 
-# 뉴스
+# --- RSI Mock ---
+@app.route("/api/rsi")
+def api_rsi():
+    return jsonify({
+        "BTC": [35, 32, 33, 37, 31],
+        "ETH": [48, 52, 47, 47, 43],
+        "HBAR": [41, 46, 42, 50, 51],
+        "XRP": [28, 31, 40, 42, 39]
+    })
+
+# --- 뉴스 API ---
 @app.route("/api/news")
 def api_news():
     feed = feedparser.parse("https://cointelegraph.com/rss")
@@ -54,16 +68,17 @@ def api_news():
             "link": entry.link,
             "date": entry.published,
             "summary": entry.summary,
-            "image": entry.get("media_content", [{}])[0].get("url", "")
+            "image": entry.get("media_content", [{}])[0].get("url", "") if entry.get("media_content") else ""
         })
     return jsonify(articles)
 
-# 경제지표
+# --- 경제지표 API ---
 @app.route("/api/economics")
 def api_economics():
     try:
         key = os.environ.get("TRADING_API_KEY", "")
-        res = requests.get(f"https://api.tradingeconomics.com/calendar?c={key}").json()
+        url = f"https://api.tradingeconomics.com/calendar?c={key}"
+        res = requests.get(url).json()
         filtered = [
             {
                 "date": d.get("date", "")[:10],
@@ -76,13 +91,27 @@ def api_economics():
             }
             for d in res if d.get("importance") == "High"
         ]
+        if not filtered:
+            return jsonify({"message": "중요 경제지표 없음"})
         sorted_data = sorted(filtered, key=lambda x: x["date"], reverse=True)
-        return jsonify(sorted_data[:15])
+        result = [
+            {
+                "date": d["date"],
+                "event": d["event"],
+                "country": d["country"],
+                "effect": "시장 영향 높음",
+                "actual": d["actual"],
+                "forecast": d["forecast"],
+                "previous": d["previous"]
+            }
+            for d in sorted_data[:15]
+        ]
+        return jsonify(result)
     except Exception as e:
         print("경제지표 API 오류:", e)
-        return jsonify([])
+        return jsonify({"message": "API 오류로 데이터를 불러올 수 없음"})
 
-# 고래 매집 데이터 (모의)
+# --- 고래 거래 MOCK ---
 def generate_mock_trades(coin):
     trades = []
     for _ in range(10):

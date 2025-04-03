@@ -1,6 +1,6 @@
 import os
-import random
 import requests
+import random
 from flask import Flask, render_template, jsonify
 from datetime import datetime
 from dotenv import load_dotenv
@@ -10,15 +10,17 @@ load_dotenv()
 
 app = Flask(__name__)
 
-# --- 시세 API ---
+# ---------------- 시세 API ----------------
 @app.route("/api/price")
 def api_price():
     try:
-        res = requests.get(
-            "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,hedera-hashgraph,ripple"
-            "&vs_currencies=usd&include_24hr_change=true").json()
-        print("==== 코인 시세 응답 ====")
-        print(res)
+        url = "https://api.coingecko.com/api/v3/simple/price"
+        params = {
+            "ids": "bitcoin,ethereum,hedera-hashgraph,ripple",
+            "vs_currencies": "usd",
+            "include_24hr_change": "true"
+        }
+        res = requests.get(url, params=params).json()
         return jsonify({
             "BTC": {
                 "price": round(res.get("bitcoin", {}).get("usd", 0), 2),
@@ -41,8 +43,7 @@ def api_price():
         print("시세 API 오류:", e)
         return jsonify({})
 
-
-# --- 뉴스 API ---
+# ---------------- 뉴스 API ----------------
 @app.route("/api/news")
 def api_news():
     feed = feedparser.parse("https://cointelegraph.com/rss")
@@ -57,48 +58,12 @@ def api_news():
         })
     return jsonify(articles)
 
-
-# --- 경제지표 API ---
+# ---------------- 경제지표 API (보류 상태) ----------------
 @app.route("/api/economics")
 def api_economics():
-    try:
-        key = os.environ.get("TRADING_API_KEY", "")
-        res = requests.get(f"https://api.tradingeconomics.com/calendar?c={key}").json()
-        print("==== 경제지표 응답 ====")
-        print(res[:2])
+    return jsonify([])  # TradingEconomics API 비활성화 상태. 나중에 다른 API로 대체 예정.
 
-        filtered = [
-            {
-                "date": d.get("date", "")[:10],
-                "event": d.get("event", ""),
-                "country": d.get("country", ""),
-                "actual": d.get("actual"),
-                "forecast": d.get("forecast"),
-                "previous": d.get("previous"),
-                "importance": d.get("importance"),
-            }
-            for d in res if d.get("importance") in ["High", "Medium"]
-        ]
-        sorted_data = sorted(filtered, key=lambda x: x["date"], reverse=True)
-        result = [
-            {
-                "date": d["date"],
-                "event": d["event"],
-                "country": d["country"],
-                "effect": "시장 영향 높음" if d["importance"] == "High" else "시장 영향 보통",
-                "actual": d["actual"],
-                "forecast": d["forecast"],
-                "previous": d["previous"]
-            }
-            for d in sorted_data[:15]
-        ]
-        return jsonify(result)
-    except Exception as e:
-        print("경제지표 API 오류:", e)
-        return jsonify([])
-
-
-# --- 고래 거래 MOCK ---
+# ---------------- 고래 거래 MOCK ----------------
 def generate_mock_trades(coin):
     trades = []
     for _ in range(10):
@@ -114,7 +79,6 @@ def generate_mock_trades(coin):
         trades.append(trade)
     return trades
 
-
 def classify_trade_type(amount, coin):
     if coin == "btc":
         if amount < 1: return "0–1"
@@ -127,21 +91,18 @@ def classify_trade_type(amount, coin):
         elif amount < 100000: return "10K–100K"
         else: return "100K+"
 
-
 @app.route("/api/btc_trades")
 def api_btc_trades():
     return jsonify(generate_mock_trades("btc"))
-
 
 @app.route("/api/hbar_trades")
 def api_hbar_trades():
     return jsonify(generate_mock_trades("hbar"))
 
-
+# ---------------- 루트 ----------------
 @app.route("/")
 def index():
     return render_template("index.html")
-
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))

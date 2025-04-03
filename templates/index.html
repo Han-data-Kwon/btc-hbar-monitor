@@ -1,189 +1,210 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-    <meta charset="UTF-8">
-    <title>고래 모니터링 대시보드</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
-    <style>
-        body.dark-mode {
-            background-color: #121212;
-            color: #fff;
-        }
-        .card {
-            transition: all 0.3s ease;
-        }
-        .dark-mode .card {
-            background-color: #1e1e1e;
-            color: #fff;
-        }
-        .tab-content {
-            margin-top: 20px;
-        }
-        .news-img {
-            width: 100%;
-            height: 180px;
-            object-fit: cover;
-        }
-        .price-card {
-            min-width: 200px;
-            margin: 10px;
-        }
-        .nav-tabs .nav-link.active {
-            background-color: #f0f0f0;
-            font-weight: bold;
-        }
-        .dark-mode .nav-tabs .nav-link.active {
-            background-color: #333;
-        }
-        .toggle-dark {
-            position: absolute;
-            top: 15px;
-            right: 15px;
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>고래 모니터링 대시보드</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-streaming@2.0.0"></script>
+  <style>
+    body {
+      font-family: "Segoe UI", sans-serif;
+      background-color: white;
+      color: black;
+      margin: 0;
+      padding: 20px;
+      transition: background-color 0.3s, color 0.3s;
+    }
+    .dark-mode {
+      background-color: #121212;
+      color: white;
+    }
+    h1 {
+      font-size: 32px;
+    }
+    .tabs button {
+      margin-right: 10px;
+      padding: 10px 15px;
+      font-size: 16px;
+      border: 1px solid #ccc;
+      background-color: #eee;
+      cursor: pointer;
+      border-radius: 6px;
+    }
+    .tabs button.active {
+      background-color: white;
+      font-weight: bold;
+      border: 2px solid black;
+    }
+    .content {
+      margin-top: 20px;
+    }
+    .card {
+      display: inline-block;
+      border: 1px solid #ccc;
+      border-radius: 10px;
+      padding: 20px;
+      margin: 10px;
+      width: 250px;
+      vertical-align: top;
+    }
+    .news-card img {
+      width: 100%;
+      height: 100px;
+      object-fit: cover;
+    }
+    .dark-mode .card {
+      background-color: #222;
+      color: white;
+      border: 1px solid #555;
+    }
+    .toggle-btn {
+      float: right;
+      padding: 8px 16px;
+      font-size: 14px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+    }
+    th, td {
+      padding: 10px;
+      border: 1px solid #ddd;
+    }
+    th {
+      background-color: #f2f2f2;
+    }
+    .dark-mode th {
+      background-color: #333;
+    }
+  </style>
 </head>
 <body>
-    <div class="container py-4">
-        <div class="d-flex justify-content-between align-items-center mb-4">
-            <h1>🐋 고래 모니터링 대시보드</h1>
-            <button class="btn btn-outline-dark toggle-dark" onclick="toggleDarkMode()">🌙 다크모드</button>
-        </div>
+  <h1>🐋 고래 모니터링 대시보드</h1>
+  <button class="toggle-btn" onclick="toggleDarkMode()">🌙 다크모드</button>
 
-        <!-- 탭 메뉴 -->
-        <ul class="nav nav-tabs" id="myTabs">
-            <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#prices">💰 시세</a></li>
-            <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#news">📰 뉴스</a></li>
-            <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#economics">📊 경제지표</a></li>
-            <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#trades">🐳 고래 거래</a></li>
-        </ul>
+  <div class="tabs">
+    <button class="tab-btn active" onclick="showTab('price')">💰 시세</button>
+    <button class="tab-btn" onclick="showTab('news')">📰 뉴스</button>
+    <button class="tab-btn" onclick="showTab('economics')">📊 경제지표</button>
+    <button class="tab-btn" onclick="showTab('whales')">🐳 고래 거래</button>
+  </div>
 
-        <!-- 탭 콘텐츠 -->
-        <div class="tab-content">
-            <!-- 시세 -->
-            <div class="tab-pane fade show active" id="prices">
-                <h3 class="mt-4">💰 주요 코인 시세</h3>
-                <div class="d-flex flex-wrap" id="price-cards"></div>
-            </div>
+  <div id="price" class="content">
+    <h2>💰 주요 코인 시세</h2>
+    <div id="price-cards"></div>
+  </div>
 
-            <!-- 뉴스 -->
-            <div class="tab-pane fade" id="news">
-                <h3 class="mt-4">📰 Cointelegraph 뉴스</h3>
-                <div class="row" id="news-container"></div>
-            </div>
+  <div id="news" class="content" style="display: none;">
+    <h2>📰 Cointelegraph 뉴스</h2>
+    <div id="news-section"></div>
+  </div>
 
-            <!-- 경제지표 -->
-            <div class="tab-pane fade" id="economics">
-                <h3 class="mt-4">📊 주요 경제지표</h3>
-                <div class="table-responsive">
-                    <table class="table table-bordered table-hover mt-3">
-                        <thead class="table-light">
-                            <tr>
-                                <th>날짜</th>
-                                <th>지표명</th>
-                                <th>국가</th>
-                                <th>이전</th>
-                                <th>예측</th>
-                                <th>실제</th>
-                                <th>해석</th>
-                            </tr>
-                        </thead>
-                        <tbody id="economics-body"></tbody>
-                    </table>
-                </div>
-            </div>
+  <div id="economics" class="content" style="display: none;">
+    <h2>📊 주요 경제지표</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>날짜</th><th>지표명</th><th>국가</th><th>이전</th><th>예측</th><th>실제</th><th>해석</th>
+        </tr>
+      </thead>
+      <tbody id="eco-table"></tbody>
+    </table>
+  </div>
 
-            <!-- 고래 거래 -->
-            <div class="tab-pane fade" id="trades">
-                <h3 class="mt-4">🐳 고래 거래</h3>
-                <p>이전 고래 거래 탭 코드 유지</p>
-            </div>
-        </div>
-    </div>
+  <div id="whales" class="content" style="display: none;">
+    <h2>🐳 고래 거래</h2>
+    <p>이전 고래 거래 탭 코드 유지</p>
+  </div>
 
-    <!-- 스크립트 -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script>
-        function toggleDarkMode() {
-            document.body.classList.toggle("dark-mode");
-        }
+  <script>
+    function toggleDarkMode() {
+      document.body.classList.toggle("dark-mode");
+    }
 
-        async function loadPrices() {
-            try {
-                const res = await fetch("/api/price");
-                const data = await res.json();
-                const container = document.getElementById("price-cards");
-                container.innerHTML = "";
-                for (const key in data) {
-                    const { price, change } = data[key];
-                    container.innerHTML += `
-                        <div class="card price-card shadow-sm">
-                            <div class="card-body">
-                                <h5 class="card-title fw-bold">${key}</h5>
-                                <p class="card-text text-success">$ ${price}</p>
-                                <p class="card-text">
-                                    <img src="https://emoji.slack-edge.com/T02J1CR6CMZ/chart/4918658c9b504b1a.png" width="20">
-                                    변화율: ${change}%
-                                </p>
-                            </div>
-                        </div>`;
-                }
-            } catch (err) {
-                console.error("시세 로딩 실패", err);
+    function showTab(id) {
+      document.querySelectorAll(".content").forEach(el => el.style.display = "none");
+      document.querySelectorAll(".tab-btn").forEach(btn => btn.classList.remove("active"));
+      document.getElementById(id).style.display = "block";
+      event.target.classList.add("active");
+    }
+
+    // 시세 불러오기
+    fetch('/api/price')
+      .then(res => res.json())
+      .then(data => {
+        const container = document.getElementById('price-cards');
+        Object.entries(data).forEach(([symbol, info]) => {
+          const color = info.change >= 0 ? 'green' : 'red';
+          container.innerHTML += `
+            <div class="card">
+              <h3>${symbol}</h3>
+              <p style="color:${color}">$ ${info.price}</p>
+              <p style="color:${color}">📉 변화율: ${info.change}%</p>
+              <canvas id="chart-${symbol}" height="50"></canvas>
+            </div>`;
+        });
+
+        // 더미 차트 생성
+        Object.keys(data).forEach(symbol => {
+          const ctx = document.getElementById(`chart-${symbol}`).getContext('2d');
+          new Chart(ctx, {
+            type: 'line',
+            data: {
+              labels: ["1H", "30M", "15M", "5M", "1M"],
+              datasets: [{
+                label: symbol,
+                data: Array.from({length: 5}, () => Math.random() * 1000),
+                borderWidth: 1,
+                fill: false,
+              }]
+            },
+            options: {
+              plugins: { legend: { display: false } },
+              scales: { x: { display: false }, y: { display: false } }
             }
-        }
+          });
+        });
+      });
 
-        async function loadNews() {
-            try {
-                const res = await fetch("/api/news");
-                const data = await res.json();
-                const container = document.getElementById("news-container");
-                container.innerHTML = "";
-                data.forEach(news => {
-                    container.innerHTML += `
-                        <div class="col-md-4 mb-4">
-                            <div class="card h-100">
-                                <img src="${news.image}" class="news-img card-img-top">
-                                <div class="card-body">
-                                    <h5 class="card-title">
-                                        <a href="${news.link}" target="_blank">${news.title}</a>
-                                    </h5>
-                                    <p class="card-text"><small class="text-muted">발행일: ${news.date}</small></p>
-                                </div>
-                            </div>
-                        </div>`;
-                });
-            } catch (err) {
-                console.error("뉴스 로딩 실패", err);
-            }
-        }
+    // 뉴스 불러오기
+    fetch('/api/news')
+      .then(res => res.json())
+      .then(news => {
+        const container = document.getElementById('news-section');
+        news.forEach(article => {
+          container.innerHTML += `
+            <div class="card news-card">
+              <img src="${article.image}" />
+              <h4><a href="${article.link}" target="_blank">${article.title}</a></h4>
+              <small>${article.date}</small>
+            </div>`;
+        });
+      });
 
-        async function loadEconomics() {
-            try {
-                const res = await fetch("/api/economics");
-                const data = await res.json();
-                const body = document.getElementById("economics-body");
-                body.innerHTML = "";
-                data.forEach(item => {
-                    body.innerHTML += `
-                        <tr>
-                            <td>${item.date}</td>
-                            <td>${item.event}</td>
-                            <td>${item.country}</td>
-                            <td>${item.previous || "-"}</td>
-                            <td>${item.forecast || "-"}</td>
-                            <td>${item.actual || "-"}</td>
-                            <td>${item.effect}</td>
-                        </tr>`;
-                });
-            } catch (err) {
-                console.error("경제지표 로딩 실패", err);
-            }
+    // 경제지표 불러오기
+    fetch('/api/economics')
+      .then(res => res.json())
+      .then(data => {
+        const table = document.getElementById('eco-table');
+        if (data.length === 0) {
+          table.innerHTML = '<tr><td colspan="7">표시할 데이터가 없습니다.</td></tr>';
+          return;
         }
-
-        // 초기 로드
-        loadPrices();
-        loadNews();
-        loadEconomics();
-    </script>
+        data.forEach(item => {
+          table.innerHTML += `
+            <tr>
+              <td>${item.date}</td>
+              <td>${item.event}</td>
+              <td>${item.country}</td>
+              <td>${item.previous || '-'}</td>
+              <td>${item.forecast || '-'}</td>
+              <td>${item.actual || '-'}</td>
+              <td>${item.effect}</td>
+            </tr>`;
+        });
+      });
+  </script>
 </body>
 </html>

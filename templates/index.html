@@ -1,101 +1,58 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-  <meta charset="UTF-8" />
-  <title>고래 모니터링 대시보드</title>
+  <meta charset="UTF-8">
+  <title>실시간 대시보드</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     body {
       font-family: 'Segoe UI', sans-serif;
-      background-color: white;
+      background: white;
       color: black;
-      transition: background-color 0.3s, color 0.3s;
     }
-    .dark-mode {
-      background-color: #1e1e1e;
-      color: white;
+    .card {
+      display: inline-block;
+      border: 1px solid #ccc;
+      padding: 12px;
+      margin: 8px;
+      width: 140px;
+      text-align: center;
+      box-shadow: 2px 2px 6px #eee;
     }
     .tab { display: none; }
     .tab.active { display: block; }
-    button { margin: 6px; padding: 8px 12px; font-weight: bold; }
-    .top-right { position: absolute; top: 10px; right: 10px; }
-    .card-row { display: flex; flex-wrap: wrap; margin-bottom: 20px; }
-    .card {
-      border: 1px solid #aaa;
-      border-radius: 8px;
-      padding: 10px;
-      margin: 6px;
-      width: 180px;
-      box-shadow: 1px 1px 4px rgba(0,0,0,0.1);
-    }
-    .chart-container {
-      width: 100%;
-      max-width: 600px;
-      margin: 20px 0;
-    }
-    table {
-      border-collapse: collapse;
-      width: 100%;
-      margin-top: 10px;
-    }
-    th, td {
-      border: 1px solid #ccc;
-      padding: 6px;
-      text-align: center;
-      font-size: 14px;
-    }
-    th { background-color: #f0f0f0; }
-    .dark-mode th { background-color: #444; }
-    .news-img {
-      max-width: 100px;
-      max-height: 80px;
-      object-fit: cover;
-      float: right;
-      margin-left: 10px;
-    }
-    .highlight-news {
-      background-color: #fff5cc;
-      border-left: 4px solid orange;
-      padding: 6px;
-    }
+    button { margin: 5px; padding: 6px 12px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    th, td { border: 1px solid #ccc; padding: 6px; text-align: center; }
+    .highlight { background: #fffbcc; }
   </style>
 </head>
 <body>
-  <h1>🐋 고래 모니터링 대시보드</h1>
+  <h1>📈 실시간 모니터링</h1>
   <div>
     <button onclick="showTab('price')">💰 시세</button>
     <button onclick="showTab('news')">📰 뉴스</button>
     <button onclick="showTab('econ')">📅 경제지표</button>
-    <button class="top-right" onclick="toggleDarkMode()">🌙 다크모드</button>
   </div>
 
-  <!-- 💰 시세 -->
+  <!-- 시세 탭 -->
   <div id="price" class="tab active">
-    <h2>💰 실시간 시세</h2>
-    <div id="priceCards" class="card-row"></div>
-
-    <div class="chart-container">
-      <h3>BTC 시세 차트 (1분 단위)</h3>
-      <canvas id="btcChart"></canvas>
-    </div>
-    <div class="chart-container">
-      <h3>BTC RSI 차트</h3>
-      <canvas id="rsiChart"></canvas>
-    </div>
+    <h2>💰 주요 코인 시세</h2>
+    <div id="priceCards"></div>
   </div>
 
-  <!-- 📰 뉴스 -->
+  <!-- 뉴스 탭 -->
   <div id="news" class="tab">
-    <h2>📰 최신 코인 뉴스</h2>
+    <h2>📰 최신 뉴스 (헤데라·암호화폐 중심)</h2>
     <div id="newsList"></div>
   </div>
 
-  <!-- 📅 경제지표 -->
+  <!-- 경제지표 탭 -->
   <div id="econ" class="tab">
-    <h2>📅 전일자 주요 경제지표</h2>
+    <h2>📅 중요 경제지표 (최신순)</h2>
     <table>
       <thead>
-        <tr><th>날짜</th><th>지표명</th><th>국가</th><th>실제</th><th>예측</th><th>이전</th><th>영향</th></tr>
+        <tr><th>날짜</th><th>지표</th><th>국가</th><th>실제</th><th>예측</th><th>이전</th></tr>
       </thead>
       <tbody id="econBody"></tbody>
     </table>
@@ -103,125 +60,82 @@
   </div>
 
   <script>
-    function showTab(id) {
-      document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
-      document.getElementById(id).classList.add("active");
-    }
-
-    function toggleDarkMode() {
-      document.body.classList.toggle("dark-mode");
+    function showTab(tab) {
+      document.querySelectorAll(".tab").forEach(el => el.classList.remove("active"));
+      document.getElementById(tab).classList.add("active");
     }
 
     async function loadPrices() {
-      const res = await fetch("/api/price");
-      const data = await res.json();
-      const el = document.getElementById("priceCards");
-      el.innerHTML = Object.keys(data).map(key => `
-        <div class="card">
-          <h3>${key}</h3>
-          <p>💲 ${data[key].price.toLocaleString()} USD</p>
-          <p>변화율: ${data[key].change}%</p>
-        </div>
-      `).join('');
-    }
-
-    async function loadRSI() {
-      const res = await fetch("/api/rsi/BTC");
-      const data = await res.json();
-      new Chart(document.getElementById("rsiChart"), {
-        type: 'line',
-        data: {
-          labels: data.labels,
-          datasets: [{
-            label: 'BTC RSI',
-            data: data.values,
-            borderColor: 'orange',
-            fill: false,
-            tension: 0.2
-          }]
-        },
-        options: {
-          plugins: {
-            tooltip: { enabled: true }
-          },
-          scales: {
-            y: { min: 0, max: 100 }
-          }
-        }
-      });
-    }
-
-    async function loadOHLCV() {
-      const res = await fetch("/api/ohlcv/BTC");
-      const data = await res.json();
-      new Chart(document.getElementById("btcChart"), {
-        type: 'line',
-        data: {
-          labels: data.labels,
-          datasets: [{
-            label: "BTC 가격",
-            data: data.prices,
-            borderColor: 'green',
-            fill: false,
-            tension: 0.2
-          }]
-        }
-      });
+      try {
+        const res = await fetch("/api/price");
+        const data = await res.json();
+        const el = document.getElementById("priceCards");
+        el.innerHTML = Object.entries(data).map(([key, val]) => `
+          <div class="card">
+            <h3>${key}</h3>
+            <p>${val.price.toLocaleString()} USD</p>
+            <p>${val.change}%</p>
+          </div>
+        `).join('');
+      } catch (e) {
+        console.error("시세 오류:", e);
+      }
     }
 
     async function loadNews() {
-      const res = await fetch("/api/news");
-      const news = await res.json();
-      const el = document.getElementById("newsList");
-      el.innerHTML = news.map(n => `
-        <div class="${n.highlight ? 'highlight-news' : ''}" style="margin-bottom:10px;">
-          ${n.image ? `<img src="${n.image}" class="news-img" />` : ""}
-          <a href="${n.link}" target="_blank"><strong>${n.title}</strong></a><br/>
-          <small>${n.date}</small><br/>
-          <em>${n.summary}</em>
-        </div>
-      `).join('');
+      try {
+        const res = await fetch("/api/news");
+        const data = await res.json();
+        const el = document.getElementById("newsList");
+        el.innerHTML = data.map(d => `
+          <div style="margin-bottom:12px;">
+            <a href="${d.link}" target="_blank"><strong>${d.title}</strong></a>
+            <p><em>${d.date}</em> | <small>${d.keyword}</small></p>
+            <p>${d.summary}</p>
+          </div>
+        `).join('');
+      } catch (e) {
+        console.error("뉴스 오류:", e);
+      }
     }
 
     async function loadEconomics() {
-      const res = await fetch("/api/economics");
-      const data = await res.json();
-      const el = document.getElementById("econBody");
-      const empty = document.getElementById("econEmpty");
-      if (data.length === 0) {
-        el.innerHTML = "";
-        empty.innerText = "전일자 경제지표가 없습니다.";
-        return;
+      try {
+        const res = await fetch("/api/economics");
+        const data = await res.json();
+        const el = document.getElementById("econBody");
+        const empty = document.getElementById("econEmpty");
+        if (data.length === 0) {
+          el.innerHTML = "";
+          empty.innerText = "표시할 경제지표가 없습니다.";
+        } else {
+          empty.innerText = "";
+          el.innerHTML = data.map(d => `
+            <tr class="${d.importance === 'High' ? 'highlight' : ''}">
+              <td>${d.date}</td>
+              <td>${d.event}</td>
+              <td>${d.country}</td>
+              <td>${d.actual}</td>
+              <td>${d.forecast}</td>
+              <td>${d.previous}</td>
+            </tr>
+          `).join('');
+        }
+      } catch (e) {
+        console.error("경제지표 오류:", e);
       }
-      empty.innerText = "";
-      el.innerHTML = data.map(d => `
-        <tr style="${d.importance === 'High' ? 'background-color:#ffe4e1;' : ''}">
-          <td>${d.date}</td>
-          <td>${d.event}</td>
-          <td>${d.country}</td>
-          <td>${d.actual}</td>
-          <td>${d.forecast}</td>
-          <td>${d.previous}</td>
-          <td>${d.importance}</td>
-        </tr>
-      `).join('');
     }
 
-    async function loadAll() {
-      await loadPrices();
-      await loadRSI();
-      await loadOHLCV();
-      await loadNews();
-      await loadEconomics();
+    function loadAll() {
+      loadPrices();
+      loadNews();
+      loadEconomics();
     }
 
     loadAll();
-    setInterval(() => {
-      loadPrices();
-      loadRSI();
-      loadOHLCV();
-    }, 30000);
-    setInterval(() => loadNews(), 300000);
+    setInterval(loadPrices, 30000);  // 시세는 30초마다
+    setInterval(loadNews, 300000);   // 뉴스는 5분마다
+    setInterval(loadEconomics, 300000);
   </script>
 </body>
 </html>

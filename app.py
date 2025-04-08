@@ -1,8 +1,7 @@
-# app.py 시작: 시세 + 뉴스 + 경제지표 (최신 구조 기반)
+# app.py
 import os
 import requests
 from flask import Flask, render_template, jsonify
-from datetime import datetime, timedelta
 from dotenv import load_dotenv
 from bs4 import BeautifulSoup
 
@@ -13,7 +12,7 @@ app = Flask(__name__)
 BINANCE_API = "https://api.binance.com/api/v3/ticker/24hr"
 TE_API_KEY = os.getenv("TRADING_API_KEY")
 
-# --- 주요 10대 코인 시세 카드 (Binance 기준)
+# 주요 10대 코인 리스트
 COINS = {
     "BTC": "BTCUSDT",
     "ETH": "ETHUSDT",
@@ -30,7 +29,7 @@ COINS = {
 @app.route("/api/price")
 def get_price():
     try:
-        res = requests.get(BINANCE_API).json()
+        res = requests.get(BINANCE_API, timeout=5).json()
         data = {}
         for coin, symbol in COINS.items():
             match = next((item for item in res if item["symbol"] == symbol), None)
@@ -44,7 +43,6 @@ def get_price():
         print("시세 오류:", e)
         return jsonify({})
 
-# --- 구글 뉴스 크롤링 (헤데라, 비트코인, 암호화폐, 트럼프 키워드 중심)
 @app.route("/api/news")
 def get_news():
     try:
@@ -52,7 +50,7 @@ def get_news():
         articles = []
         for kw in keywords:
             url = f"https://news.google.com/search?q={kw}&hl=ko&gl=KR&ceid=KR:ko"
-            html = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}).text
+            html = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=5).text
             soup = BeautifulSoup(html, "html.parser")
             items = soup.select("article")[:3]
             for item in items:
@@ -64,7 +62,7 @@ def get_news():
                         "title": title.text.strip(),
                         "link": f'https://news.google.com{link["href"][1:]}',
                         "date": time_tag.get("datetime", "")[:10],
-                        "summary": kw + " 관련 기사",
+                        "summary": f"{kw} 관련 뉴스",
                         "keyword": kw
                     })
         return jsonify(articles)
@@ -72,12 +70,11 @@ def get_news():
         print("뉴스 오류:", e)
         return jsonify([])
 
-# --- 중요도 High 경제지표 최신순 10개
 @app.route("/api/economics")
 def get_economics():
     try:
         url = f"https://api.tradingeconomics.com/calendar?importance=high&c={TE_API_KEY}"
-        res = requests.get(url).json()
+        res = requests.get(url, timeout=5).json()
         filtered = [
             {
                 "date": d.get("date", "")[:10],

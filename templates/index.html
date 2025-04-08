@@ -3,28 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <title>실시간 코인 모니터링</title>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
-    body {
-      font-family: 'Segoe UI', sans-serif;
-      background: white;
-      color: black;
-    }
-    .card {
-      display: inline-block;
-      border: 1px solid #ccc;
-      padding: 12px;
-      margin: 8px;
-      width: 140px;
-      text-align: center;
-      box-shadow: 2px 2px 6px #eee;
-    }
+    .card { display:inline-block; border:1px solid #ccc; padding:10px; margin:6px; width:120px; }
     .tab { display: none; }
     .tab.active { display: block; }
-    button { margin: 5px; padding: 6px 12px; }
-    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-    th, td { border: 1px solid #ccc; padding: 6px; text-align: center; }
-    .highlight { background: #fffbcc; }
   </style>
 </head>
 <body>
@@ -35,98 +17,73 @@
     <button onclick="showTab('econ')">📅 경제지표</button>
   </div>
 
-  <!-- 💰 시세 탭 -->
   <div id="price" class="tab active">
     <h2>💰 주요 코인 시세</h2>
     <div id="priceCards"></div>
   </div>
 
-  <!-- 📰 뉴스 탭 -->
   <div id="news" class="tab">
-    <h2>📰 최신 뉴스 (헤데라·암호화폐 중심)</h2>
+    <h2>📰 최신 뉴스</h2>
     <div id="newsList"></div>
   </div>
 
-  <!-- 📅 경제지표 탭 -->
   <div id="econ" class="tab">
-    <h2>📅 중요 경제지표 (최신순)</h2>
-    <table>
-      <thead>
-        <tr><th>날짜</th><th>지표</th><th>국가</th><th>실제</th><th>예측</th><th>이전</th></tr>
-      </thead>
+    <h2>📅 경제지표</h2>
+    <table border="1" width="100%">
+      <thead><tr><th>날짜</th><th>지표</th><th>국가</th><th>실제</th><th>예측</th><th>이전</th></tr></thead>
       <tbody id="econBody"></tbody>
     </table>
-    <div id="econEmpty" style="color: gray;"></div>
   </div>
 
   <script>
-    function showTab(tab) {
-      document.querySelectorAll(".tab").forEach(el => el.classList.remove("active"));
-      document.getElementById(tab).classList.add("active");
+    function showTab(id) {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.getElementById(id).classList.add('active');
     }
 
     async function loadPrices() {
-      try {
-        const res = await fetch("/api/price");
-        const data = await res.json();
-        console.log("시세 데이터:", data);
-        const el = document.getElementById("priceCards");
-        el.innerHTML = Object.entries(data).map(([key, val]) => `
-          <div class="card">
-            <h3>${key}</h3>
-            <p>${val.price.toLocaleString()} USD</p>
-            <p>${val.change}%</p>
-          </div>
-        `).join('');
-      } catch (e) {
-        console.error("시세 오류:", e);
-      }
+      const res = await fetch("/api/price");
+      const data = await res.json();
+      console.log("시세 데이터:", data);
+      const el = document.getElementById("priceCards");
+      el.innerHTML = Object.entries(data).map(([key, val]) => `
+        <div class="card">
+          <h4>${key}</h4>
+          <p>$${val.price}</p>
+          <p>${val.change}%</p>
+        </div>
+      `).join('');
     }
 
     async function loadNews() {
-      try {
-        const res = await fetch("/api/news");
-        const data = await res.json();
-        console.log("뉴스 데이터:", data);
-        const el = document.getElementById("newsList");
-        el.innerHTML = data.map(d => `
-          <div style="margin-bottom:12px;">
-            <a href="${d.link}" target="_blank"><strong>${d.title}</strong></a>
-            <p><em>${d.date}</em> | <small>${d.keyword}</small></p>
-            <p>${d.summary}</p>
-          </div>
-        `).join('');
-      } catch (e) {
-        console.error("뉴스 오류:", e);
-      }
+      const res = await fetch("/api/news");
+      const data = await res.json();
+      console.log("뉴스 데이터:", data);
+      const el = document.getElementById("newsList");
+      el.innerHTML = data.map(item => `
+        <div style="margin-bottom:10px;">
+          <a href="${item.link}" target="_blank"><strong>${item.title}</strong></a><br/>
+          <small>${item.date}</small><br/>
+          <p>${item.summary}</p>
+        </div>
+      `).join('');
     }
 
     async function loadEconomics() {
-      try {
-        const res = await fetch("/api/economics");
-        const data = await res.json();
-        console.log("경제지표 데이터:", data);
-        const el = document.getElementById("econBody");
-        const empty = document.getElementById("econEmpty");
-        if (data.length === 0) {
-          el.innerHTML = "";
-          empty.innerText = "표시할 경제지표가 없습니다.";
-        } else {
-          empty.innerText = "";
-          el.innerHTML = data.map(d => `
-            <tr class="${d.importance === 'High' ? 'highlight' : ''}">
-              <td>${d.date}</td>
-              <td>${d.event}</td>
-              <td>${d.country}</td>
-              <td>${d.actual}</td>
-              <td>${d.forecast}</td>
-              <td>${d.previous}</td>
-            </tr>
-          `).join('');
-        }
-      } catch (e) {
-        console.error("경제지표 오류:", e);
-      }
+      const res = await fetch("/api/economics");
+      const data = await res.json();
+      console.log("경제지표 데이터:", data);
+      const el = document.getElementById("econBody");
+      el.innerHTML = data.map(d => `
+        <tr>
+          <td>${d.date}</td>
+          <td>${d.event}</td>
+          <td>${d.country}</td>
+          <td>${d.actual}</td>
+          <td>${d.forecast}</td>
+          <td>${d.previous}</td>
+        </tr>
+      `).join('');
     }
 
     function loadAll() {
@@ -135,12 +92,10 @@
       loadEconomics();
     }
 
-    document.addEventListener("DOMContentLoaded", () => {
-      loadAll();
-      setInterval(loadPrices, 30000);   // 30초마다 시세 업데이트
-      setInterval(loadNews, 300000);    // 5분마다 뉴스
-      setInterval(loadEconomics, 300000); // 5분마다 경제지표
-    });
+    loadAll();
+    setInterval(loadPrices, 30000);     // 30초마다 시세 업데이트
+    setInterval(loadNews, 300000);      // 5분마다 뉴스 업데이트
+    setInterval(loadEconomics, 300000); // 5분마다 경제지표 업데이트
   </script>
 </body>
 </html>

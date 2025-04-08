@@ -1,43 +1,40 @@
-# app.py
+# app.py 전체 수정본 디버깅 로그 포함 버전 재로드
+
 import os
 import requests
 from flask import Flask, render_template, jsonify
+from datetime import datetime
 from dotenv import load_dotenv
 from bs4 import BeautifulSoup
 
 load_dotenv()
-
 app = Flask(__name__)
 
 BINANCE_API = "https://api.binance.com/api/v3/ticker/24hr"
 TE_API_KEY = os.getenv("TRADING_API_KEY")
 
-# 주요 10대 코인 리스트
 COINS = {
-    "BTC": "BTCUSDT",
-    "ETH": "ETHUSDT",
-    "BNB": "BNBUSDT",
-    "XRP": "XRPUSDT",
-    "ADA": "ADAUSDT",
-    "SOL": "SOLUSDT",
-    "DOGE": "DOGEUSDT",
-    "AVAX": "AVAXUSDT",
-    "HBAR": "HBARUSDT",
-    "LINK": "LINKUSDT"
+    "BTC": "BTCUSDT", "ETH": "ETHUSDT", "BNB": "BNBUSDT", "XRP": "XRPUSDT", "ADA": "ADAUSDT",
+    "SOL": "SOLUSDT", "DOGE": "DOGEUSDT", "AVAX": "AVAXUSDT", "HBAR": "HBARUSDT", "LINK": "LINKUSDT"
 }
 
 @app.route("/api/price")
 def get_price():
     try:
-        res = requests.get(BINANCE_API, timeout=5).json()
+        res = requests.get(BINANCE_API)
+        res.raise_for_status()
+        json_data = res.json()
+        print("Binance 응답 샘플:", json_data[:3])
+
         data = {}
         for coin, symbol in COINS.items():
-            match = next((item for item in res if item["symbol"] == symbol), None)
+            match = next((item for item in json_data if item["symbol"] == symbol), None)
             if match:
                 data[coin] = {
                     "price": round(float(match["lastPrice"]), 4),
                     "change": round(float(match["priceChangePercent"]), 2)
                 }
+        print("시세 수:", len(data))
         return jsonify(data)
     except Exception as e:
         print("시세 오류:", e)
@@ -50,7 +47,8 @@ def get_news():
         articles = []
         for kw in keywords:
             url = f"https://news.google.com/search?q={kw}&hl=ko&gl=KR&ceid=KR:ko"
-            html = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=5).text
+            headers = {"User-Agent": "Mozilla/5.0"}
+            html = requests.get(url, headers=headers).text
             soup = BeautifulSoup(html, "html.parser")
             items = soup.select("article")[:3]
             for item in items:
@@ -60,11 +58,12 @@ def get_news():
                 if title and link and time_tag:
                     articles.append({
                         "title": title.text.strip(),
-                        "link": f'https://news.google.com{link["href"][1:]}',
+                        "link": f"https://news.google.com{link['href'][1:]}",
                         "date": time_tag.get("datetime", "")[:10],
                         "summary": f"{kw} 관련 뉴스",
                         "keyword": kw
                     })
+        print("뉴스 건수:", len(articles))
         return jsonify(articles)
     except Exception as e:
         print("뉴스 오류:", e)
@@ -74,20 +73,23 @@ def get_news():
 def get_economics():
     try:
         url = f"https://api.tradingeconomics.com/calendar?importance=high&c={TE_API_KEY}"
-        res = requests.get(url, timeout=5).json()
-        filtered = [
-            {
-                "date": d.get("date", "")[:10],
-                "event": d.get("event"),
-                "country": d.get("country"),
-                "actual": d.get("actual"),
-                "forecast": d.get("forecast"),
-                "previous": d.get("previous"),
-                "importance": d.get("importance")
-            }
-            for d in res if d.get("date")
-        ]
+        res = requests.get(url)
+        res.raise_for_status()
+        json_data = res.json()
+        print("TE 응답 수:", len(json_data))
+
+        filtered = [dict(
+            date=d.get("date", "")[:10],
+            event=d.get("event"),
+            country=d.get("country"),
+            actual=d.get("actual"),
+            forecast=d.get("forecast"),
+            previous=d.get("previous"),
+            importance=d.get("importance")
+        ) for d in json_data if d.get("date")]
+
         sorted_data = sorted(filtered, key=lambda x: x["date"], reverse=True)[:10]
+        print("경제지표 수:", len(sorted_data))
         return jsonify(sorted_data)
     except Exception as e:
         print("경제지표 오류:", e)

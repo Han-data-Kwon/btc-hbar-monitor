@@ -1,61 +1,66 @@
 import os
 import requests
 from flask import Flask, render_template, jsonify
-from bs4 import BeautifulSoup
+from datetime import datetime, timedelta
 from dotenv import load_dotenv
 
 load_dotenv()
 app = Flask(__name__)
 
-# CoinGecko API (대안 시세 API)
-COINS = {
-    "bitcoin": "BTC",
-    "ethereum": "ETH",
-    "binancecoin": "BNB",
-    "ripple": "XRP",
-    "cardano": "ADA",
-    "solana": "SOL",
-    "dogecoin": "DOGE",
-    "avalanche-2": "AVAX",
-    "hedera-hashgraph": "HBAR",
-    "chainlink": "LINK"
-}
+COINGECKO_PRICE_API = "https://api.coingecko.com/api/v3/simple/price"
+COINGECKO_MARKET_API = "https://api.coingecko.com/api/v3/coins/markets"
+TE_API_KEY = os.getenv("TRADING_API_KEY")
+NEWSDATA_API_KEY = os.getenv("NEWSDATA_API_KEY")
+
+TOP_COINS = [
+    "bitcoin", "ethereum", "binancecoin", "ripple", "cardano",
+    "solana", "dogecoin", "avalanche-2", "hedera-hashgraph", "chainlink"
+]
 
 @app.route("/api/price")
 def get_price():
     try:
-        ids = ",".join(COINS.keys())
-        url = f"https://api.coingecko.com/api/v3/simple/price?ids={ids}&vs_currencies=usd&include_24hr_change=true"
-        res = requests.get(url)
-        data = res.json()
-        result = {}
-        for cid, symbol in COINS.items():
-            if cid in data:
-                result[symbol] = {
-                    "price": data[cid]["usd"],
-                    "change": round(data[cid]["usd_24h_change"], 2)
-                }
-        return jsonify(result)
+        ids = ",".join(TOP_COINS)
+        res = requests.get(f"{COINGECKO_PRICE_API}?ids={ids}&vs_currencies=usd&include_24hr_change=true").json()
+        data = {}
+        for coin in TOP_COINS:
+            coin_key = coin.upper() if coin != "hedera-hashgraph" else "HBAR"
+            data[coin_key] = {
+                "price": round(res[coin]["usd"], 4),
+                "change": round(res[coin]["usd_24h_change"], 2)
+            }
+        return jsonify(data)
     except Exception as e:
-        print("가격 오류:", e)
+        print("시세 오류:", e)
         return jsonify({})
+
+@app.route("/api/treemap")
+def get_treemap():
+    try:
+        res = requests.get(f"{COINGECKO_MARKET_API}?vs_currency=usd&order=market_cap_desc&per_page=50&page=1").json()
+        data = [{"name": coin["symbol"].upper(), "value": coin["market_cap"]} for coin in res]
+        return jsonify(data)
+    except Exception as e:
+        print("트리맵 오류:", e)
+        return jsonify([])
 
 @app.route("/api/news")
 def get_news():
     try:
-        rss_url = "https://www.coindesk.com/arc/outboundfeeds/rss/?outputType=xml"
-        rss = requests.get(rss_url).text
-        soup = BeautifulSoup(rss, "xml")
-        items = soup.find_all("item")[:10]
-        results = []
-        for item in items:
-            results.append({
-                "title": item.title.text,
-                "link": item.link.text,
-                "date": item.pubDate.text,
-                "summary": item.description.text
-            })
-        return jsonify(results)
+        keywords = ["Trump", "HBAR", "Bitcoin"]
+        articles = []
+        for kw in keywords:
+            url = f"https://newsdata.io/api/1/news?apikey={NEWSDATA_API_KEY}&q={kw}&language=en,ko"
+            res = requests.get(url).json()
+            for item in res.get("results", [])[:3]:
+                articles.append({
+                    "title": item.get("title", ""),
+                    "link": item.get("link", ""),
+                    "date": item.get("pubDate", "")[:10],
+                    "source": item.get("source_id", ""),
+                    "keyword": kw
+                })
+        return jsonify(articles)
     except Exception as e:
         print("뉴스 오류:", e)
         return jsonify([])
@@ -63,27 +68,25 @@ def get_news():
 @app.route("/api/economics")
 def get_economics():
     try:
-        # Fallback mock economic data
-        return jsonify([
+        today = datetime.utcnow()
+        yesterday = today - timedelta(days=1)
+        start_date = yesterday.strftime("%Y-%m-%d")
+        end_date = today.strftime("%Y-%m-%d")
+        url = f"https://api.tradingeconomics.com/calendar/country/united states?c={TE_API_KEY}&d1={start_date}&d2={end_date}"
+        res = requests.get(url).json()
+        data = [
             {
-                "date": "2025-04-07",
-                "event": "미국 기준금리 결정",
-                "country": "US",
-                "actual": "5.25%",
-                "forecast": "5.25%",
-                "previous": "5.25%",
-                "importance": "High"
-            },
-            {
-                "date": "2025-04-07",
-                "event": "실업률",
-                "country": "US",
-                "actual": "3.8%",
-                "forecast": "3.9%",
-                "previous": "3.8%",
-                "importance": "Medium"
+                "date": d.get("date", "")[:10],
+                "event": d.get("event", ""),
+                "country": d.get("country", ""),
+                "actual": d.get("actual"),
+                "forecast": d.get("forecast"),
+                "previous": d.get("previous")
             }
-        ])
+            for d in res if d.get("event")
+        ]
+        sorted_data = sorted(data, key=lambda x: x["date"], reverse=True)
+        return jsonify(sorted_data)
     except Exception as e:
         print("경제지표 오류:", e)
         return jsonify([])

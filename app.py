@@ -7,88 +7,115 @@ from dotenv import load_dotenv
 load_dotenv()
 app = Flask(__name__)
 
-COINGECKO_PRICE_API = "https://api.coingecko.com/api/v3/simple/price"
-COINGECKO_MARKET_API = "https://api.coingecko.com/api/v3/coins/markets"
-TE_API_KEY = os.getenv("TRADING_API_KEY")
-NEWSDATA_API_KEY = os.getenv("NEWSDATA_API_KEY")
-
-TOP_COINS = [
-    "bitcoin", "ethereum", "binancecoin", "ripple", "cardano",
-    "solana", "dogecoin", "avalanche-2", "hedera-hashgraph", "chainlink"
-]
-
+# --- CoinGecko 시세 데이터 ---
 @app.route("/api/price")
 def get_price():
     try:
-        ids = ",".join(TOP_COINS)
-        res = requests.get(f"{COINGECKO_PRICE_API}?ids={ids}&vs_currencies=usd&include_24hr_change=true").json()
-        data = {}
-        for coin in TOP_COINS:
-            coin_key = coin.upper() if coin != "hedera-hashgraph" else "HBAR"
-            data[coin_key] = {
-                "price": round(res[coin]["usd"], 4),
-                "change": round(res[coin]["usd_24h_change"], 2)
+        url = "https://api.coingecko.com/api/v3/simple/price"
+        params = {
+            "ids": "bitcoin,ethereum,binancecoin,xrp,cardano,solana,dogecoin,avalanche-2,hedera,chainlink",
+            "vs_currencies": "usd",
+            "include_24hr_change": "true"
+        }
+        res = requests.get(url, params=params).json()
+        return jsonify({
+            key.upper(): {
+                "price": round(res[key]["usd"], 4),
+                "change": round(res[key]["usd_24h_change"], 2)
             }
-        return jsonify(data)
+            for key in res
+        })
     except Exception as e:
         print("시세 오류:", e)
         return jsonify({})
 
+# --- CoinGecko 시가총액 트리맵용 데이터 ---
 @app.route("/api/treemap")
 def get_treemap():
     try:
-        res = requests.get(f"{COINGECKO_MARKET_API}?vs_currency=usd&order=market_cap_desc&per_page=50&page=1").json()
-        data = [{"name": coin["symbol"].upper(), "value": coin["market_cap"]} for coin in res]
-        return jsonify(data)
+        url = "https://api.coingecko.com/api/v3/coins/markets"
+        params = {
+            "vs_currency": "usd",
+            "order": "market_cap_desc",
+            "per_page": 50,
+            "page": 1
+        }
+        res = requests.get(url, params=params).json()
+        return jsonify([
+            {"name": coin["symbol"].upper(), "value": coin["market_cap"]}
+            for coin in res
+        ])
     except Exception as e:
         print("트리맵 오류:", e)
         return jsonify([])
 
+# --- NewsData.io 뉴스 (영어/한글, 특정 키워드 기반) ---
 @app.route("/api/news")
 def get_news():
     try:
+        key = os.getenv("NEWSDATA_API_KEY")
         keywords = ["Trump", "HBAR", "Bitcoin"]
         articles = []
         for kw in keywords:
-            url = f"https://newsdata.io/api/1/news?apikey={NEWSDATA_API_KEY}&q={kw}&language=en,ko"
+            url = f"https://newsdata.io/api/1/news?apikey={key}&q={kw}&language=en,ko"
             res = requests.get(url).json()
-            for item in res.get("results", [])[:3]:
-                articles.append({
-                    "title": item.get("title", ""),
-                    "link": item.get("link", ""),
-                    "date": item.get("pubDate", "")[:10],
-                    "source": item.get("source_id", ""),
-                    "keyword": kw
-                })
+            if res.get("results"):
+                for item in res["results"][:3]:
+                    articles.append({
+                        "title": item.get("title"),
+                        "link": item.get("link"),
+                        "date": item.get("pubDate", "")[:10],
+                        "summary": item.get("description", ""),
+                        "keyword": kw
+                    })
         return jsonify(articles)
     except Exception as e:
         print("뉴스 오류:", e)
         return jsonify([])
 
+# --- FRED 경제지표 (미국 전일~당일 기준) ---
 @app.route("/api/economics")
 def get_economics():
     try:
-        today = datetime.utcnow()
-        yesterday = today - timedelta(days=1)
-        start_date = yesterday.strftime("%Y-%m-%d")
-        end_date = today.strftime("%Y-%m-%d")
-        url = f"https://api.tradingeconomics.com/calendar/country/united states?c={TE_API_KEY}&d1={start_date}&d2={end_date}"
-        res = requests.get(url).json()
-        data = [
-            {
-                "date": d.get("date", "")[:10],
-                "event": d.get("event", ""),
-                "country": d.get("country", ""),
-                "actual": d.get("actual"),
-                "forecast": d.get("forecast"),
-                "previous": d.get("previous")
-            }
-            for d in res if d.get("event")
-        ]
-        sorted_data = sorted(data, key=lambda x: x["date"], reverse=True)
-        return jsonify(sorted_data)
+        key = os.getenv("FRED_API_KEY")
+        now = datetime.utcnow()
+        start_date = (now - timedelta(days=1)).strftime("%Y-%m-%d")
+        end_date = now.strftime("%Y-%m-%d")
+        url = f"https://api.stlouisfed.org/fred/releases/dates?api_key={key}&file_type=json"
+        release_dates = requests.get(url).json()
+        releases = []
+
+        for release in release_dates.get("release_dates", []):
+            date = release.get("date")
+            if start_date <= date <= end_date:
+                releases.append({
+                    "date": date,
+                    "name": release.get("release_name", "N/A")
+                })
+
+        return jsonify(sorted(releases, key=lambda x: x["date"], reverse=True))
     except Exception as e:
         print("경제지표 오류:", e)
+        return jsonify([])
+
+# --- ClankApp 고래 추적 (공개 API 사용) ---
+@app.route("/api/whales")
+def get_whales():
+    try:
+        url = "https://public.clankapp.com/api/v1/alerts"
+        res = requests.get(url).json()
+        whales = []
+        for tx in res.get("alerts", [])[:15]:
+            whales.append({
+                "time": tx.get("timestamp", "")[:19].replace("T", " "),
+                "coin": tx.get("symbol", ""),
+                "amount": tx.get("amount", 0),
+                "from": tx.get("from", ""),
+                "to": tx.get("to", "")
+            })
+        return jsonify(whales)
+    except Exception as e:
+        print("고래 데이터 오류:", e)
         return jsonify([])
 
 @app.route("/")

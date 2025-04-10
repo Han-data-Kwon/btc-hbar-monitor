@@ -2,134 +2,117 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8">
-  <title>실시간 코인 대시보드</title>
+  <title>코인 모니터링 대시보드</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.2/dist/echarts.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/echarts/dist/echarts.min.js"></script>
   <style>
     body {
       font-family: 'Segoe UI', sans-serif;
-      background-color: white;
-      color: black;
-      margin: 0;
-      padding: 20px;
+      background-color: #fff;
+      color: #000;
+      margin: 20px;
     }
+    button { margin: 5px; padding: 6px 14px; }
     .tab { display: none; }
     .tab.active { display: block; }
     .card {
       display: inline-block;
-      border: 1px solid #ccc;
+      border: 1px solid #ddd;
       padding: 10px;
-      margin: 8px;
-      width: 140px;
+      margin: 5px;
+      width: 130px;
       text-align: center;
-      box-shadow: 2px 2px 6px #eee;
+      box-shadow: 2px 2px 5px #eee;
     }
-    .treemap-container {
-      width: 100%;
-      height: 500px;
-      margin-top: 20px;
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 10px;
-    }
-    th, td {
-      border: 1px solid #ccc;
-      padding: 6px;
-      text-align: center;
-    }
-    .highlight { background-color: #fff9c4; }
-    button { padding: 8px 12px; margin: 4px; }
+    table { border-collapse: collapse; width: 100%; margin-top: 15px; }
+    th, td { border: 1px solid #ccc; padding: 6px; font-size: 14px; text-align: center; }
+    .highlight { background-color: #fff3cd; }
+    #treemap { width: 100%; height: 500px; margin-top: 20px; }
   </style>
 </head>
 <body>
-  <h1>📊 실시간 코인 모니터링 대시보드</h1>
+  <h1>📊 코인 실시간 대시보드</h1>
   <div>
     <button onclick="showTab('price')">💰 시세</button>
     <button onclick="showTab('news')">📰 뉴스</button>
     <button onclick="showTab('econ')">📅 경제지표</button>
+    <button onclick="showTab('whales')">🐋 고래추적</button>
   </div>
 
-  <!-- 시세 탭 -->
+  <!-- 💰 시세 탭 -->
   <div id="price" class="tab active">
     <h2>💰 주요 코인 시세</h2>
     <div id="priceCards"></div>
-    <h3>📦 시가총액 트리맵</h3>
-    <div id="treemap" class="treemap-container"></div>
+    <div id="treemap"></div>
   </div>
 
-  <!-- 뉴스 탭 -->
+  <!-- 📰 뉴스 탭 -->
   <div id="news" class="tab">
-    <h2>📰 관련 뉴스 (HBAR / Bitcoin / Trump)</h2>
+    <h2>📰 주요 키워드 뉴스</h2>
     <div id="newsList"></div>
   </div>
 
-  <!-- 경제지표 탭 -->
+  <!-- 📅 경제지표 탭 -->
   <div id="econ" class="tab">
-    <h2>📅 미국 경제지표 (전일~당일)</h2>
+    <h2>📅 전일~당일 미국 경제지표</h2>
     <table>
-      <thead>
-        <tr><th>날짜</th><th>지표명</th><th>국가</th><th>실제</th><th>예측</th><th>이전</th></tr>
-      </thead>
+      <thead><tr><th>날짜</th><th>지표명</th></tr></thead>
       <tbody id="econBody"></tbody>
     </table>
-    <div id="econEmpty" style="color: gray;"></div>
+  </div>
+
+  <!-- 🐋 고래추적 탭 -->
+  <div id="whales" class="tab">
+    <h2>🐋 최근 대규모 이체</h2>
+    <table>
+      <thead><tr><th>시간</th><th>코인</th><th>수량</th><th>From</th><th>To</th></tr></thead>
+      <tbody id="whaleBody"></tbody>
+    </table>
   </div>
 
   <script>
-    function showTab(tab) {
+    function showTab(tabId) {
       document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
-      document.getElementById(tab).classList.add("active");
+      document.getElementById(tabId).classList.add("active");
     }
 
     async function loadPrices() {
       const res = await fetch("/api/price");
       const data = await res.json();
-      const container = document.getElementById("priceCards");
-      container.innerHTML = Object.entries(data).map(([symbol, val]) => `
+      const el = document.getElementById("priceCards");
+      el.innerHTML = Object.entries(data).map(([k,v]) => `
         <div class="card">
-          <h3>${symbol}</h3>
-          <p>${val.price.toLocaleString()} USD</p>
-          <p style="color:${val.change >= 0 ? 'green' : 'red'};">
-            ${val.change}%
-          </p>
+          <h3>${k}</h3>
+          <p>${v.price.toLocaleString()} USD</p>
+          <p>${v.change}%</p>
         </div>
       `).join('');
     }
 
     async function loadTreemap() {
-      try {
-        const res = await fetch("/api/treemap");
-        const data = await res.json();
-        const chartDom = document.getElementById('treemap');
-        const myChart = echarts.init(chartDom);
-        const option = {
-          tooltip: { formatter: info => `${info.name}<br/>${info.value.toLocaleString()} USD` },
-          series: [{
-            type: 'treemap',
-            data: data.map(coin => ({
-              name: `${coin.name} (${coin.symbol})`,
-              value: coin.market_cap,
-            })),
-            leafDepth: 1,
-            label: { show: true, formatter: '{b}' }
-          }]
-        };
-        myChart.setOption(option);
-      } catch (e) {
-        console.error("트리맵 오류:", e);
-      }
+      const res = await fetch("/api/treemap");
+      const data = await res.json();
+      const chart = echarts.init(document.getElementById('treemap'));
+      chart.setOption({
+        series: [{
+          type: 'treemap',
+          data: data.map(d => ({ name: d.name, value: d.value })),
+          label: { show: true },
+          roam: false,
+          nodeClick: false
+        }]
+      });
     }
 
     async function loadNews() {
       const res = await fetch("/api/news");
       const data = await res.json();
-      const container = document.getElementById("newsList");
-      container.innerHTML = data.map(article => `
-        <div style="margin-bottom:10px;">
-          <a href="${article.link}" target="_blank"><strong>${article.title}</strong></a><br/>
-          <small>${article.date} | ${article.source}</small>
+      const el = document.getElementById("newsList");
+      el.innerHTML = data.map(d => `
+        <div style="margin-bottom: 12px;">
+          <a href="${d.link}" target="_blank"><strong>${d.title}</strong></a><br/>
+          <small>${d.date} | ${d.keyword}</small><br/>
+          <em>${d.summary}</em>
         </div>
       `).join('');
     }
@@ -137,22 +120,21 @@
     async function loadEconomics() {
       const res = await fetch("/api/economics");
       const data = await res.json();
-      const tbody = document.getElementById("econBody");
-      const empty = document.getElementById("econEmpty");
-      if (!data || data.length === 0) {
-        empty.innerText = "표시할 경제지표가 없습니다.";
-        tbody.innerHTML = "";
-        return;
-      }
-      empty.innerText = "";
-      tbody.innerHTML = data.map(d => `
+      document.getElementById("econBody").innerHTML = data.map(d => `
+        <tr><td>${d.date}</td><td>${d.name}</td></tr>
+      `).join('');
+    }
+
+    async function loadWhales() {
+      const res = await fetch("/api/whales");
+      const data = await res.json();
+      document.getElementById("whaleBody").innerHTML = data.map(d => `
         <tr>
-          <td>${d.date}</td>
-          <td>${d.event}</td>
-          <td>${d.country}</td>
-          <td>${d.actual}</td>
-          <td>${d.forecast}</td>
-          <td>${d.previous}</td>
+          <td>${d.time}</td>
+          <td>${d.coin}</td>
+          <td>${d.amount.toLocaleString()}</td>
+          <td>${d.from}</td>
+          <td>${d.to}</td>
         </tr>
       `).join('');
     }
@@ -162,13 +144,15 @@
       loadTreemap();
       loadNews();
       loadEconomics();
+      loadWhales();
     }
 
     loadAll();
-    setInterval(loadPrices, 30000);     // 30초마다 시세 카드
-    setInterval(loadTreemap, 60000);    // 1분마다 트리맵
-    setInterval(loadNews, 1200000);     // 20분마다 뉴스
-    setInterval(loadEconomics, 300000); // 5분마다 경제지표
+    setInterval(loadPrices, 30000);
+    setInterval(loadTreemap, 60000);
+    setInterval(loadNews, 1200000);      // 20분
+    setInterval(loadEconomics, 1200000);  // 20분
+    setInterval(loadWhales, 30000);      // 30초
   </script>
 </body>
 </html>

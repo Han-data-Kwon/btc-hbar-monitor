@@ -3,8 +3,19 @@
 <head>
   <meta charset="UTF-8" />
   <title>Crypto Dashboard</title>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-treemap@1.3.0/dist/chartjs-chart-treemap.min.js"></script>
+
+  <!-- Chart.js 4.x (필수) -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+  <!-- chartjs-chart-treemap 플러그인 (v4 전용) -->
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-treemap@4.1.0/dist/chartjs-chart-treemap.umd.min.js"></script>
+
+  <!-- 플러그인 등록 -->
+  <script>
+    const { TreemapController, TreemapElement } = ChartT;
+    Chart.register(TreemapController, TreemapElement);
+  </script>
+
   <style>
     body {
       font-family: 'Segoe UI', sans-serif;

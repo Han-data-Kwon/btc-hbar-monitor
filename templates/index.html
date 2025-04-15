@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <title>Crypto Dashboard</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-treemap"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-treemap@1.3.0/dist/chartjs-chart-treemap.min.js"></script>
   <style>
     body {
       font-family: 'Segoe UI', sans-serif;
@@ -12,72 +12,26 @@
       padding: 20px;
       color: #222;
     }
-
-    h2 {
-      margin-top: 40px;
-      font-size: 22px;
-    }
-
-    .card-container {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 12px;
-    }
-
+    h2 { margin-top: 40px; font-size: 22px; }
+    .card-container { display: flex; flex-wrap: wrap; gap: 12px; }
     .card {
-      background-color: white;
-      border: 1px solid #ccc;
-      border-radius: 8px;
-      padding: 10px 14px;
-      width: 160px;
+      background-color: white; border: 1px solid #ccc; border-radius: 8px;
+      padding: 10px 14px; width: 160px;
       box-shadow: 1px 1px 4px rgba(0,0,0,0.05);
     }
-
-    .card h4 {
-      margin: 0 0 4px 0;
-      font-size: 16px;
-    }
-
-    .price {
-      font-size: 17px;
-      font-weight: bold;
-    }
-
-    .change {
-      font-size: 14px;
-    }
-
-    canvas {
-      margin-top: 20px;
-      background: white;
-      border-radius: 10px;
-    }
-
-    .section {
-      margin-top: 40px;
-    }
-
-    .econ-item, .news-item, .whale-item {
-      background: #fff;
-      margin-bottom: 10px;
-      padding: 10px;
-      border-radius: 8px;
-      box-shadow: 1px 1px 4px rgba(0,0,0,0.05);
-    }
-
-    .news-item a {
-      text-decoration: none;
-      color: #0366d6;
-    }
-
-    .news-item small {
-      color: #666;
-      font-size: 12px;
-    }
-
+    .card h4 { margin: 0 0 4px 0; font-size: 16px; }
+    .price { font-size: 17px; font-weight: bold; }
+    .change { font-size: 14px; }
     .change.positive { color: green; }
     .change.negative { color: red; }
-
+    canvas { margin-top: 20px; background: white; border-radius: 10px; }
+    .section { margin-top: 40px; }
+    .econ-item, .news-item, .whale-item {
+      background: #fff; margin-bottom: 10px; padding: 10px; border-radius: 8px;
+      box-shadow: 1px 1px 4px rgba(0,0,0,0.05);
+    }
+    .news-item a { text-decoration: none; color: #0366d6; }
+    .news-item small { color: #666; font-size: 12px; }
   </style>
 </head>
 <body>
@@ -106,117 +60,87 @@
   </div>
 
 <script>
-  // --- 시세 카드 ---
-  fetch("/api/price")
-    .then(res => res.json())
-    .then(data => {
-      const container = document.getElementById("price-cards");
-      Object.keys(data).forEach(symbol => {
-        const info = data[symbol];
-        const changeClass = info.change >= 0 ? 'positive' : 'negative';
-        const card = document.createElement("div");
-        card.className = "card";
-        card.innerHTML = `
-          <h4>${symbol}</h4>
-          <div class="price">${info.price} USD</div>
-          <div class="change ${changeClass}">24h: ${info.change}%</div>
-        `;
-        container.appendChild(card);
-      });
+  fetch("/api/price").then(res => res.json()).then(data => {
+    const container = document.getElementById("price-cards");
+    Object.keys(data).forEach(symbol => {
+      const info = data[symbol];
+      const changeClass = info.change >= 0 ? 'positive' : 'negative';
+      const card = document.createElement("div");
+      card.className = "card";
+      card.innerHTML = `<h4>${symbol}</h4>
+        <div class="price">${info.price} USD</div>
+        <div class="change ${changeClass}">24h: ${info.change}%</div>`;
+      container.appendChild(card);
     });
+  });
 
-  // --- 트리맵 ---
-  fetch("/api/treemap")
-    .then(res => res.json())
-    .then(data => {
-      const ctx = document.getElementById("treemapChart").getContext("2d");
-      new Chart(ctx, {
-        type: 'treemap',
-        data: {
-          datasets: [{
-            label: 'Market Cap',
-            tree: data,
-            key: 'value',
-            groups: ['name'],
-            backgroundColor: (ctx) => {
-              const v = ctx.raw.v;
-              const max = Math.max(...data.map(d => d.value));
-              const ratio = v / max;
-              const colorVal = 200 - Math.round(ratio * 150);
-              return `rgba(30, 136, 229, ${0.4 + ratio * 0.6})`;
-            },
-            labels: {
-              display: true,
-              align: 'center',
-              color: 'black',
-              font: { size: 12 },
-              formatter: ctx => ctx.raw.g
-            }
-          }]
-        },
-        options: {
-          plugins: { legend: { display: false } }
-        }
-      });
+  fetch("/api/treemap").then(res => res.json()).then(data => {
+    const ctx = document.getElementById("treemapChart").getContext("2d");
+    new Chart(ctx, {
+      type: 'treemap',
+      data: {
+        datasets: [{
+          label: 'Market Cap',
+          tree: data,
+          key: 'value',
+          groups: ['name'],
+          backgroundColor: (ctx) => {
+            const v = ctx.raw.v;
+            const max = Math.max(...data.map(d => d.value));
+            const ratio = v / max;
+            return `rgba(30, 136, 229, ${0.4 + ratio * 0.6})`;
+          },
+          labels: {
+            display: true,
+            align: 'center',
+            color: 'black',
+            font: { size: 12 },
+            formatter: ctx => ctx.raw.g
+          }
+        }]
+      },
+      options: { plugins: { legend: { display: false } } }
     });
+  });
 
-  // --- 뉴스 섹션 ---
-  fetch("/api/news")
-    .then(res => res.json())
-    .then(data => {
-      const area = document.getElementById("news-section");
-      if (!data.length) {
-        area.innerHTML = "<p>뉴스 데이터가 없습니다.</p>";
-        return;
-      }
-      data.forEach(article => {
-        area.innerHTML += `
-          <div class="news-item">
-            <a href="${article.link}" target="_blank">${article.title}</a>
-            <div><small>${article.date} | ${article.keyword}</small></div>
-            <div>${article.summary}</div>
-          </div>
-        `;
-      });
+  fetch("/api/news").then(res => res.json()).then(data => {
+    const area = document.getElementById("news-section");
+    if (!data.length) {
+      area.innerHTML = "<p>뉴스 데이터가 없습니다.</p>"; return;
+    }
+    data.forEach(article => {
+      area.innerHTML += `<div class="news-item">
+        <a href="${article.link}" target="_blank">${article.title}</a>
+        <div><small>${article.date} | ${article.keyword}</small></div>
+        <div>${article.summary}</div>
+      </div>`;
     });
+  });
 
-  // --- 경제 지표 ---
-  fetch("/api/economics")
-    .then(res => res.json())
-    .then(data => {
-      const econ = document.getElementById("econ-list");
-      if (!data.length) {
-        econ.innerHTML = "<p>표시할 경제 지표가 없습니다.</p>";
-        return;
-      }
-      data.forEach(item => {
-        if (item.value === "N/A") return;
-        econ.innerHTML += `
-          <div class="econ-item">
-            <strong>${item.name}</strong> (${item.date}): ${item.value}<br/>
-            <small>${item.desc}</small>
-          </div>
-        `;
-      });
+  fetch("/api/economics").then(res => res.json()).then(data => {
+    const econ = document.getElementById("econ-list");
+    if (!data.length) {
+      econ.innerHTML = "<p>표시할 경제 지표가 없습니다.</p>"; return;
+    }
+    data.forEach(item => {
+      econ.innerHTML += `<div class="econ-item">
+        <strong>${item.name}</strong> (${item.date}): ${item.value}<br/>
+        <small>${item.desc}</small>
+      </div>`;
     });
+  });
 
-  // --- 고래 추적 ---
-  fetch("/api/whales")
-    .then(res => res.json())
-    .then(data => {
-      const area = document.getElementById("whale-list");
-      if (!data.length) {
-        area.innerHTML = "<p>고래 거래 데이터가 없습니다.</p>";
-        return;
-      }
-      data.forEach(tx => {
-        area.innerHTML += `
-          <div class="whale-item">
-            [${tx.time}] ${tx.coin} - ${tx.amount} from ${tx.from} to ${tx.to}
-          </div>
-        `;
-      });
+  fetch("/api/whales").then(res => res.json()).then(data => {
+    const area = document.getElementById("whale-list");
+    if (!data.length) {
+      area.innerHTML = "<p>고래 거래 데이터가 없습니다.</p>"; return;
+    }
+    data.forEach(tx => {
+      area.innerHTML += `<div class="whale-item">
+        [${tx.time}] ${tx.coin} - ${tx.amount} from ${tx.from} to ${tx.to}
+      </div>`;
     });
+  });
 </script>
 
 </body>

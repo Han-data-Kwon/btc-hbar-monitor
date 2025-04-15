@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 load_dotenv()
 app = Flask(__name__)
 
-# --- CoinGecko 시세 데이터 ---
+# --- 시세 카드 ---
 @app.route("/api/price")
 def get_price():
     try:
@@ -29,7 +29,7 @@ def get_price():
         print("시세 오류:", e)
         return jsonify({})
 
-# --- CoinGecko 시가총액 트리맵 데이터 ---
+# --- 트리맵 (시총 % 및 색상 비중) ---
 @app.route("/api/treemap")
 def get_treemap():
     try:
@@ -41,19 +41,19 @@ def get_treemap():
             "page": 1
         }
         res = requests.get(url, params=params).json()
-        total_market_cap = sum(coin["market_cap"] for coin in res if coin["market_cap"])
+        total_market_cap = sum(coin["market_cap"] for coin in res if coin.get("market_cap"))
         return jsonify([
             {
                 "name": f"{coin['symbol'].upper()} ({coin['name']})\n{round(coin['market_cap'] / total_market_cap * 100, 2)}%",
                 "value": coin["market_cap"]
             }
-            for coin in res
+            for coin in res if coin.get("market_cap")
         ])
     except Exception as e:
         print("트리맵 오류:", e)
         return jsonify([])
 
-# --- 뉴스 API ---
+# --- 뉴스 섹션 ---
 @app.route("/api/news")
 def get_news():
     try:
@@ -77,7 +77,7 @@ def get_news():
         print("뉴스 오류:", e)
         return jsonify([])
 
-# --- FRED 경제지표 observation 값 있는 항목만 출력 ---
+# --- 경제지표 (observation 값 있는 것만 필터링) ---
 @app.route("/api/economics")
 def get_economics():
     try:
@@ -89,34 +89,43 @@ def get_economics():
         releases_url = f"https://api.stlouisfed.org/fred/releases/dates?api_key={key}&file_type=json"
         release_dates = requests.get(releases_url).json()
 
+        # 예시 series_id 매핑
+        series_map = {
+            "Federal Funds Data": "FEDFUNDS",
+            "Consumer Price Index": "CPIAUCNS",
+            "Interest Rate Spreads": "T10Y2Y",
+            "H.15 Selected Interest Rates": "DGS10",
+            "H.10 Foreign Exchange Rates": "DEXUSAL",
+        }
+
         result = []
         for r in release_dates.get("release_dates", []):
             date = r.get("date")
             if start_date <= date <= end_date:
-                release_name = r.get("release_name", "N/A")
-
-                # 예시 observation (CPI 시리즈로 대표 조회)
+                name = r.get("release_name", "N/A")
+                series_id = series_map.get(name)
                 value = "N/A"
-                try:
-                    obs_url = f"https://api.stlouisfed.org/fred/series/observations"
-                    obs_params = {
-                        "api_key": key,
-                        "series_id": "CPIAUCNS",  # 대표 시리즈
-                        "file_type": "json",
-                        "sort_order": "desc",
-                        "limit": 1
-                    }
-                    obs_data = requests.get(obs_url, params=obs_params).json()
-                    value = obs_data.get("observations", [{}])[0].get("value", "N/A")
-                except:
-                    pass
+                if series_id:
+                    try:
+                        obs_url = f"https://api.stlouisfed.org/fred/series/observations"
+                        obs_params = {
+                            "api_key": key,
+                            "series_id": series_id,
+                            "file_type": "json",
+                            "sort_order": "desc",
+                            "limit": 1
+                        }
+                        obs_data = requests.get(obs_url, params=obs_params).json()
+                        value = obs_data.get("observations", [{}])[0].get("value", "N/A")
+                    except:
+                        pass
 
                 if value != "N/A":
                     result.append({
                         "date": date,
-                        "name": release_name,
+                        "name": name,
                         "value": value,
-                        "desc": f"{release_name}에 대한 간단 설명입니다."
+                        "desc": f"{name}에 대한 간단 설명입니다."
                     })
 
         return jsonify(sorted(result, key=lambda x: x["date"], reverse=True))
@@ -124,7 +133,7 @@ def get_economics():
         print("경제지표 오류:", e)
         return jsonify([])
 
-# --- ClankApp 고래 추적 ---
+# --- 고래 추적 ---
 @app.route("/api/whales")
 def get_whales():
     try:
@@ -132,8 +141,6 @@ def get_whales():
         res = requests.get(url).json()
         whales = []
         alerts = res.get("alerts", [])
-        if not alerts:
-            print("ClankApp 응답에 alerts 없음")
         for tx in alerts[:15]:
             whales.append({
                 "time": tx.get("timestamp", "")[:19].replace("T", " "),
